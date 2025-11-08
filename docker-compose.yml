@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # MongoDB para persistencia de datos
+  mongodb:
+    image: mongo:7.0
+    container_name: hacknation_mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=hacknation_medical
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      - hacknation_network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Aplicación FastAPI (opcional, para desarrollo con Docker)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hacknation_app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    volumes:
+      - ./app:/app/app
+      - ./data:/app/data
+      - ./logs:/app/logs
+    networks:
+      - hacknation_network
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local
+
+networks:
+  hacknation_network:
+    driver: bridge
