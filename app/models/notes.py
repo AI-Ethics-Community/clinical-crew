@@ -48,32 +48,32 @@ Fecha y hora: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
 
 
 class PlantillaNotaContrarreferencia(BaseModel):
-    """Plantilla para generar nota de counter_referral"""
+    """Template for generating counter-referral note"""
     specialty: str
-    evaluacion: str
-    evidencia_consultada: List[str]
+    evaluation: str
+    evidence_consulted: List[str]
     clinical_reasoning: str
-    respuesta: str
-    recomendaciones: List[str]
+    response: str
+    recommendations: List[str]
     evidence_level: str
-    informacion_adicional_requerida: Optional[List[str]] = None
+    additional_information_required: Optional[List[str]] = None
 
     def generar_nota(self) -> str:
         """Genera la nota de counter_referral formateada"""
 
-        # Formatear evidencia
-        evidencia_str = "\n".join([f"• {ev}" for ev in self.evidencia_consultada])
+        # Format evidence
+        evidence_str = "\n".join([f"• {ev}" for ev in self.evidence_consulted])
 
-        # Formatear recomendaciones
-        recomendaciones_str = "\n".join([f"{i+1}. {rec}" for i, rec in enumerate(self.recomendaciones)])
+        # Format recommendations
+        recommendations_str = "\n".join([f"{i+1}. {rec}" for i, rec in enumerate(self.recommendations)])
 
-        # Información adicional si aplica
-        info_adicional_str = ""
-        if self.informacion_adicional_requerida:
-            info_adicional = "\n".join([f"• {info}" for info in self.informacion_adicional_requerida])
-            info_adicional_str = f"""
-INFORMACIÓN ADICIONAL REQUERIDA:
-{info_adicional}
+        # Additional information if applicable
+        additional_info_str = ""
+        if self.additional_information_required:
+            additional_info = "\n".join([f"• {info}" for info in self.additional_information_required])
+            additional_info_str = f"""
+ADDITIONAL INFORMATION REQUIRED:
+{additional_info}
 """
 
         nota = f"""
@@ -81,24 +81,24 @@ INFORMACIÓN ADICIONAL REQUERIDA:
 ║              NOTA DE CONTRARREFERENCIA - {self.specialty.upper()}                    ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
-EVALUACIÓN:
-{self.evaluacion}
+EVALUATION:
+{self.evaluation}
 
-REVISIÓN DE EVIDENCIA:
-{evidencia_str}
+EVIDENCE REVIEW:
+{evidence_str}
 
-RAZONAMIENTO CLÍNICO:
+CLINICAL REASONING:
 {self.clinical_reasoning}
 
-RESPUESTA A LA PREGUNTA:
-{self.respuesta}
+RESPONSE TO QUESTION:
+{self.response}
 
-RECOMENDACIONES:
-{recomendaciones_str}
+RECOMMENDATIONS:
+{recommendations_str}
 
-NIVEL DE EVIDENCIA:
+EVIDENCE LEVEL:
 {self.evidence_level}
-{info_adicional_str}
+{additional_info_str}
 ────────────────────────────────────────────────────────────────────────────────
 Fecha y hora: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
 Specialist: {self.specialty}

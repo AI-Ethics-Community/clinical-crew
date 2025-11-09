@@ -1,5 +1,5 @@
 """
-Modelos de base de datos con Beanie (MongoDB ODM).
+Database models with Beanie (MongoDB ODM).
 """
 from datetime import datetime
 from typing import Dict, List, Optional, Any
@@ -8,142 +8,145 @@ from pydantic import Field
 
 from app.models.consultation import (
     PatientContext,
-    EvaluacionGeneral,
+    GeneralEvaluation,
     InterconsultationNote,
     CounterReferralNote,
     ClinicalRecord,
+    InterrogationQuestion,
 )
 
 
 class MedicalConsultation(Document):
     """
-    Documento principal de consultation médica en MongoDB.
+    Main medical consultation document in MongoDB.
     """
+    user_id: Optional[str] = Field(None, description="User ID")
+    original_consultation: str = Field(..., description="Original medical consultation")
+    patient_context: PatientContext = Field(..., description="Patient context")
 
-    # Información básica
-    usuario_id: Optional[str] = Field(None, description="ID del usuario")
-    original_consultation: str = Field(..., description="Consulta original del médico")
-    patient_context: PatientContext = Field(..., description="Contexto del paciente")
-
-    # Estado
-    estado: Indexed(str) = Field(  # type: ignore
-        default="evaluando",
-        description="Estado actual: evaluando, interconsultando, esperando_info, completado, error"
+    status: Indexed(str) = Field(  # type: ignore
+        default="interrogating",
+        description="Current status: interrogating, evaluating, interconsulting, waiting_info, completed, error"
     )
 
-    # Flujo de trabajo
-    general_evaluation: Optional[EvaluacionGeneral] = Field(
+    interrogation_questions: List[InterrogationQuestion] = Field(
+        default_factory=list,
+        description="GP interrogation questions"
+    )
+
+    user_responses: Optional[Dict[str, Any]] = Field(
         None,
-        description="Evaluación del médico general"
+        description="User responses to interrogation"
+    )
+
+    interrogation_completed: bool = Field(
+        default=False,
+        description="Whether interrogation phase is complete"
+    )
+
+    general_evaluation: Optional[GeneralEvaluation] = Field(
+        None,
+        description="General practitioner evaluation"
     )
 
     interconsultations: List[InterconsultationNote] = Field(
         default_factory=list,
-        description="Notas de interconsultation generadas"
+        description="Generated interconsultation notes"
     )
 
     counter_referrals: List[CounterReferralNote] = Field(
         default_factory=list,
-        description="Respuestas de specialists"
+        description="Specialist responses"
     )
 
-    # Preguntas pendientes
     pending_questions: List[str] = Field(
         default_factory=list,
-        description="Preguntas que requieren respuesta del usuario"
+        description="Questions requiring user response"
     )
 
     additional_information: Optional[Dict[str, Any]] = Field(
         None,
-        description="Información adicional proporcionada por el usuario"
+        description="Additional information provided by user"
     )
 
-    # Expediente final
     clinical_record: Optional[ClinicalRecord] = Field(
         None,
-        description="Expediente clínico completo"
+        description="Complete clinical record"
     )
 
-    # Metadata
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-    completed_at: Optional[datetime] = Field(None, description="Fecha de completado")
+    completed_at: Optional[datetime] = Field(None, description="Completion date")
 
-    # Tracking y debugging
-    error_message: Optional[str] = Field(None, description="Mensaje de error si aplica")
+    error_message: Optional[str] = Field(None, description="Error message if applicable")
     execution_trace: List[Dict[str, Any]] = Field(
         default_factory=list,
-        description="Trace de ejecución para debugging"
+        description="Execution trace for debugging"
     )
 
     class Settings:
         name = "medical_consultations"
         indexes = [
-            "usuario_id",
-            "estado",
+            "user_id",
+            "status",
             "created_at",
         ]
 
     def add_trace(self, step: str, data: Any):
-        """Agrega un paso al trace de ejecución"""
+        """Add step to execution trace"""
         self.execution_trace.append({
             "timestamp": datetime.utcnow(),
             "step": step,
             "data": data
         })
 
-    def actualizar_estado(self, nuevo_estado: str):
-        """Actualiza el estado de la consultation"""
-        self.estado = nuevo_estado
+    def update_status(self, new_status: str):
+        """Update consultation status"""
+        self.status = new_status
         self.updated_at = datetime.utcnow()
-        if nuevo_estado == "completado":
+        if new_status == "completed":
             self.completed_at = datetime.utcnow()
 
-    def agregar_interconsulta(self, interconsultation: InterconsultationNote):
-        """Agrega una nota de interconsultation"""
+    def add_interconsultation(self, interconsultation: InterconsultationNote):
+        """Add interconsultation note"""
         self.interconsultations.append(interconsultation)
         self.updated_at = datetime.utcnow()
 
-    def agregar_contrarreferencia(self, counter_referral: CounterReferralNote):
-        """Agrega una nota de counter_referral"""
+    def add_counter_referral(self, counter_referral: CounterReferralNote):
+        """Add counter-referral note"""
         self.counter_referrals.append(counter_referral)
         self.updated_at = datetime.utcnow()
 
-    def tiene_preguntas_pendientes(self) -> bool:
-        """Verifica si hay preguntas pendientes"""
+    def has_pending_questions(self) -> bool:
+        """Check if there are pending questions"""
         return len(self.pending_questions) > 0
 
-    def todas_contrarreferencias_recibidas(self) -> bool:
-        """Verifica si se recibieron todas las counter_referrals esperadas"""
+    def all_counter_referrals_received(self) -> bool:
+        """Check if all expected counter-referrals have been received"""
         return len(self.counter_referrals) >= len(self.interconsultations)
 
 
 class DocumentoRAG(Document):
     """
-    Documento para tracking de documentos indexados en RAG.
+    Document for tracking RAG indexed documents.
     """
+    specialty: Indexed(str) = Field(..., description="Medical specialty")  # type: ignore
+    filename: str = Field(..., description="Original filename")
+    file_path: str = Field(..., description="File path")
+    document_type: str = Field(..., description="Type: guideline, article, manual, etc.")
 
-    specialty: Indexed(str) = Field(..., description="Especialidad médica")  # type: ignore
-    filename: str = Field(..., description="Nombre del archivo original")
-    file_path: str = Field(..., description="Ruta del archivo")
-    document_type: str = Field(..., description="Tipo: guia, articulo, manual, etc.")
+    titulo: Optional[str] = Field(None, description="Document title")
+    autor: Optional[str] = Field(None, description="Author(s)")
+    publication_date: Optional[datetime] = Field(None, description="Publication date")
+    fuente: Optional[str] = Field(None, description="Source (journal, institution, etc.)")
 
-    # Metadata del documento
-    titulo: Optional[str] = Field(None, description="Título del documento")
-    autor: Optional[str] = Field(None, description="Autor(es)")
-    publication_date: Optional[datetime] = Field(None, description="Fecha de publicación")
-    fuente: Optional[str] = Field(None, description="Fuente (journal, institución, etc.)")
+    document_hash: str = Field(..., description="Content hash for change detection")
+    chunk_ids: List[str] = Field(default_factory=list, description="Chunk IDs in ChromaDB")
+    total_chunks: int = Field(default=0, description="Total chunks generated")
 
-    # Indexación
-    document_hash: str = Field(..., description="Hash del contenido para detectar cambios")
-    chunk_ids: List[str] = Field(default_factory=list, description="IDs de chunks en ChromaDB")
-    total_chunks: int = Field(default=0, description="Total de chunks generados")
+    indexado: bool = Field(default=False, description="Is indexed in ChromaDB?")
+    indexing_date: Optional[datetime] = Field(None, description="Indexing date")
 
-    # Estado
-    indexado: bool = Field(default=False, description="¿Está indexado en ChromaDB?")
-    indexing_date: Optional[datetime] = Field(None, description="Fecha de indexación")
-
-    # Metadata
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -158,25 +161,21 @@ class DocumentoRAG(Document):
 
 class BusquedaPubMed(Document):
     """
-    Cache de búsquedas en PubMed.
+    PubMed search cache.
     """
+    query: Indexed(str) = Field(..., description="Search query")  # type: ignore
+    specialty: Optional[str] = Field(None, description="Related specialty")
 
-    query: Indexed(str) = Field(..., description="Query de búsqueda")  # type: ignore
-    specialty: Optional[str] = Field(None, description="Especialidad relacionada")
+    pmids: List[str] = Field(default_factory=list, description="Found PMIDs")
+    total_results: int = Field(default=0, description="Total results")
 
-    # Resultados
-    pmids: List[str] = Field(default_factory=list, description="PMIDs encontrados")
-    total_results: int = Field(default=0, description="Total de resultados")
-
-    # Detalles de artículos
     articulos: List[Dict[str, Any]] = Field(
         default_factory=list,
-        description="Detalles de los artículos"
+        description="Article details"
     )
 
-    # Cache
     search_date: datetime = Field(default_factory=datetime.utcnow)
-    ttl_dias: int = Field(default=7, description="Días de validez del cache")
+    ttl_dias: int = Field(default=7, description="Cache validity in days")
 
     class Settings:
         name = "cache_pubmed"
@@ -186,18 +185,17 @@ class BusquedaPubMed(Document):
         ]
 
     def es_valido(self) -> bool:
-        """Verifica si el cache aún es válido"""
+        """Check if cache is still valid"""
         dias_transcurridos = (datetime.utcnow() - self.search_date).days
         return dias_transcurridos < self.ttl_dias
 
 
-# Inicialización de Beanie
 async def init_db(database):
     """
-    Inicializa Beanie con los modelos.
+    Initialize Beanie with models.
 
     Args:
-        database: Instancia de motor.motor_asyncio.AsyncIOMotorDatabase
+        database: motor.motor_asyncio.AsyncIOMotorDatabase instance
     """
     from beanie import init_beanie
 

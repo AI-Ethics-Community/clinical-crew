@@ -13,11 +13,16 @@ from app.agents.prompts.general_practitioner import (
     PROMPT_INTEGRAR_RESPUESTAS,
     PROMPT_SOLICITAR_INFORMACION,
 )
+from app.agents.prompts.interrogation import (
+    PROMPT_GENERATE_INTERROGATION_QUESTIONS,
+    PROMPT_EVALUATE_RESPONSES,
+)
 from app.models.consultation import (
-    EvaluacionGeneral,
+    GeneralEvaluation,
     InterconsultationNote,
     CounterReferralNote,
     PatientContext,
+    InterrogationQuestion,
 )
 from app.models.notes import FormatoContextoPaciente
 
@@ -40,7 +45,7 @@ class GeneralPractitionerAgent:
 
     async def evaluate_consultation(
         self, consultation: str, patient_context: PatientContext
-    ) -> EvaluacionGeneral:
+    ) -> GeneralEvaluation:
         """
         Evaluate initial consultation and decide on routing.
 
@@ -66,16 +71,16 @@ class GeneralPractitionerAgent:
         response_data = self._parse_json_response(response_text)
 
         # Create evaluation object
-        evaluacion = EvaluacionGeneral(
+        evaluacion = GeneralEvaluation(
             can_answer_directly=response_data.get("can_answer_directly", False),
             required_specialists=response_data.get("required_specialists", []),
-            razonamiento=response_data.get("razonamiento", ""),
+            reasoning=response_data.get("reasoning", response_data.get("razonamiento", "")),
             estimated_complexity=response_data.get("estimated_complexity", 0.5),
         )
 
         # Store direct response if applicable
         if evaluacion.can_answer_directly:
-            evaluacion.respuesta_directa = response_data.get("respuesta_directa", "")
+            evaluacion.direct_response = response_data.get("direct_response", response_data.get("respuesta_directa", ""))
 
         return evaluacion
 
@@ -181,6 +186,55 @@ class GeneralPractitionerAgent:
 
         return response_data
 
+    async def generate_interrogation_questions(
+        self, consultation: str, patient_context: PatientContext
+    ) -> Dict[str, Any]:
+        """
+        Generate interrogation questions for patient information gathering.
+
+        Args:
+            consultation: Medical consultation question
+            patient_context: Patient context
+
+        Returns:
+            Dictionary with questions, can_proceed flag, and reasoning
+        """
+        contexto_str = FormatoContextoPaciente.formatear(patient_context.model_dump())
+
+        prompt = PROMPT_GENERATE_INTERROGATION_QUESTIONS.format(
+            consultation=consultation, patient_context=contexto_str
+        )
+
+        response_text = await self.gemini_client.generate_content_async(prompt)
+        response_data = self._parse_json_response(response_text)
+
+        return response_data
+
+    async def evaluate_responses(
+        self, questions: List[InterrogationQuestion], responses: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Evaluate if user responses are sufficient to proceed.
+
+        Args:
+            questions: Questions that were asked
+            responses: User's responses
+
+        Returns:
+            Dictionary with is_sufficient, missing_critical_info, can_proceed, additional_questions
+        """
+        questions_str = json.dumps([q.model_dump() for q in questions], indent=2)
+        responses_str = json.dumps(responses, indent=2)
+
+        prompt = PROMPT_EVALUATE_RESPONSES.format(
+            questions=questions_str, responses=responses_str
+        )
+
+        response_text = await self.gemini_client.generate_content_async(prompt)
+        response_data = self._parse_json_response(response_text)
+
+        return response_data
+
     def _format_contrarreferencias(
         self, counter_referrals: List[CounterReferralNote]
     ) -> str:
@@ -200,16 +254,16 @@ class GeneralPractitionerAgent:
 [Specialist {i}: {contra.specialty}]
 
 Evaluation:
-{contra.evaluacion}
+{contra.evaluation}
 
 Clinical Reasoning:
 {contra.clinical_reasoning}
 
 Response:
-{contra.respuesta}
+{contra.response}
 
 Recommendations:
-{self._format_list(contra.recomendaciones)}
+{self._format_list(contra.recommendations)}
 
 Evidence Used:
 {self._format_list(contra.evidence_used)}

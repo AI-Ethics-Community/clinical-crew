@@ -3,7 +3,7 @@ Base class for medical specialist agents.
 """
 import json
 import yaml
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Callable
 from pathlib import Path
 
 from app.services.gemini_client import gemini_especialista
@@ -11,6 +11,7 @@ from app.services.pubmed_client import pubmed_client
 from app.rag.retriever import retriever
 from app.agents.prompts.specialists import get_prompt_especialista
 from app.models.consultation import CounterReferralNote, PatientContext
+from app.models.sources import ScientificSource, SourceType
 from app.models.notes import FormatoContextoPaciente
 from app.config.settings import settings
 
@@ -18,16 +19,29 @@ from app.config.settings import settings
 class SpecialistAgent:
     """Base class for all medical specialist agents"""
 
-    def __init__(self, specialty: str):
+    def __init__(
+        self,
+        specialty: str,
+        on_tool_start: Optional[Callable] = None,
+        on_tool_complete: Optional[Callable] = None,
+        on_source_found: Optional[Callable] = None
+    ):
         """
         Initialize the specialist agent.
 
         Args:
             specialty: Medical specialty name
+            on_tool_start: Callback when a tool starts
+            on_tool_complete: Callback when a tool completes
+            on_source_found: Callback when a source is found
         """
         self.specialty = specialty
         self.config = self._load_config()
         self.gemini_client = gemini_especialista
+        self.sources: List[ScientificSource] = []
+        self.on_tool_start = on_tool_start
+        self.on_tool_complete = on_tool_complete
+        self.on_source_found = on_source_found
 
     def _load_config(self) -> Dict[str, Any]:
         """
@@ -47,54 +61,64 @@ class SpecialistAgent:
 
         return all_config['specialists'][specialty_key]
 
-    async def process_interconsulta(
+    async def process_interconsultation(
         self,
-        interconsulta_id: str,
-        pregunta: str,
-        contexto: Dict[str, Any],
+        interconsultation_id: str,
+        question: str,
+        context: Dict[str, Any],
         patient_context: PatientContext
     ) -> CounterReferralNote:
         """
         Process an interconsultation request.
 
         Args:
-            interconsulta_id: ID of the interconsultation
-            pregunta: Specific question from general practitioner
-            contexto: Relevant context for this specialty
+            interconsultation_id: ID of the interconsultation
+            question: Specific question from general practitioner
+            context: Relevant context for this specialty
             patient_context: Full patient context
 
         Returns:
             Counter-referral note with specialist's response
         """
-        # Step 1: Retrieve from RAG knowledge base
-        rag_context = await self._retrieve_from_rag(pregunta)
+        self.sources = []
 
-        # Step 2: Search PubMed if needed
-        pubmed_context = await self._search_pubmed(pregunta)
+        if self.on_tool_start:
+            await self.on_tool_start("rag_retrieval", self.specialty)
+        rag_context = await self._retrieve_from_rag(question)
+        if self.on_tool_complete:
+            await self.on_tool_complete("rag_retrieval", self.specialty)
 
-        # Step 3: Generate response with Gemini
+        if self.on_tool_start:
+            await self.on_tool_start("pubmed_search", self.specialty)
+        pubmed_context = await self._search_pubmed(question)
+        if self.on_tool_complete:
+            await self.on_tool_complete("pubmed_search", self.specialty)
+
+        if self.on_tool_start:
+            await self.on_tool_start("response_generation", self.specialty)
         response = await self._generate_response(
-            pregunta=pregunta,
-            contexto=contexto,
+            question=question,
+            context=context,
             patient_context=patient_context,
             rag_context=rag_context,
             pubmed_context=pubmed_context
         )
+        if self.on_tool_complete:
+            await self.on_tool_complete("response_generation", self.specialty)
 
-        # Step 4: Parse and create counter-referral
-        counter_referral = self._create_contrarreferencia(
-            interconsulta_id=interconsulta_id,
+        counter_referral = self._create_counter_referral(
+            interconsultation_id=interconsultation_id,
             response_data=response
         )
 
         return counter_referral
 
-    async def _retrieve_from_rag(self, pregunta: str, top_k: int = 5) -> str:
+    async def _retrieve_from_rag(self, question: str, top_k: int = 5) -> str:
         """
         Retrieve relevant information from RAG knowledge base.
 
         Args:
-            pregunta: Question to search for
+            question: Question to search for
             top_k: Number of results to retrieve
 
         Returns:
@@ -102,11 +126,24 @@ class SpecialistAgent:
         """
         try:
             result = retriever.retrieve_with_context(
-                query=pregunta,
+                query=question,
                 specialty=self.specialty,
                 top_k=top_k,
                 include_sources=True
             )
+
+            if 'sources' in result:
+                for source_dict in result['sources']:
+                    source = ScientificSource(
+                        source_type=SourceType.RAG,
+                        title=source_dict.get('title', 'Unknown'),
+                        content=source_dict.get('content', ''),
+                        metadata=source_dict.get('metadata', {})
+                    )
+                    self.sources.append(source)
+                    if self.on_source_found:
+                        await self.on_source_found(source)
+
             return result['context']
         except Exception as e:
             print(f"Error retrieving from RAG: {str(e)}")
@@ -114,14 +151,14 @@ class SpecialistAgent:
 
     async def _search_pubmed(
         self,
-        pregunta: str,
+        question: str,
         max_results: int = 5
     ) -> str:
         """
         Search PubMed for relevant articles using keyword extraction.
 
         Args:
-            pregunta: Spanish medical question to search for
+            question: Medical question to search for
             max_results: Maximum number of articles
 
         Returns:
@@ -133,7 +170,7 @@ class SpecialistAgent:
                 print(f"💡 Extracting medical keywords for PubMed search...")
                 try:
                     keywords_data = await pubmed_client.extract_medical_keywords_async(
-                        pregunta, self.specialty
+                        question, self.specialty
                     )
                 except Exception as e:
                     print(f"⚠ Keyword extraction failed: {str(e)}. Using specialty fallback.")
@@ -175,14 +212,28 @@ class SpecialistAgent:
                 print("⚠ No articles found")
                 return "No relevant articles found in PubMed for this query."
             
-            # Step 4: Fetch article details
             articles = pubmed_client.fetch_details(pmids)
-            
+
             if not articles:
                 print("⚠ Could not fetch article details")
                 return "No articles found in PubMed."
-            
-            # Format for context
+
+            for article in articles:
+                source = ScientificSource(
+                    source_type=SourceType.PUBMED,
+                    title=article.get('title', 'Unknown'),
+                    content=article.get('abstract', ''),
+                    pmid=article.get('pmid'),
+                    doi=article.get('doi'),
+                    authors=article.get('authors', []),
+                    journal=article.get('journal'),
+                    publication_date=article.get('publication_date'),
+                    url=f"https://pubmed.ncbi.nlm.nih.gov/{article.get('pmid')}/" if article.get('pmid') else None
+                )
+                self.sources.append(source)
+                if self.on_source_found:
+                    await self.on_source_found(source)
+
             print(f"✓ Retrieved {len(articles)} PubMed articles")
             return pubmed_client.format_articles_for_context(articles)
 
@@ -192,8 +243,8 @@ class SpecialistAgent:
 
     async def _generate_response(
         self,
-        pregunta: str,
-        contexto: Dict[str, Any],
+        question: str,
+        context: Dict[str, Any],
         patient_context: PatientContext,
         rag_context: str,
         pubmed_context: str
@@ -202,8 +253,8 @@ class SpecialistAgent:
         Generate response using Gemini.
 
         Args:
-            pregunta: Specific question
-            contexto: Relevant context
+            question: Specific question
+            context: Relevant context
             patient_context: Patient context
             rag_context: Context from RAG
             pubmed_context: Context from PubMed
@@ -212,12 +263,12 @@ class SpecialistAgent:
             Parsed response data
         """
         # Format patient context
-        contexto_paciente_str = FormatoContextoPaciente.formatear(
+        patient_context_str = FormatoContextoPaciente.formatear(
             patient_context.model_dump()
         )
 
         # Format interconsultation context
-        contexto_str = json.dumps(contexto, indent=2, ensure_ascii=False)
+        context_str = json.dumps(context, indent=2, ensure_ascii=False)
 
         # Get system instruction from config
         system_instruction = self.config.get('system_prompt', '')
@@ -226,9 +277,9 @@ class SpecialistAgent:
         prompt = get_prompt_especialista(
             specialty=self.specialty,
             system_instruction=system_instruction,
-            pregunta=pregunta,
-            contexto=contexto_str,
-            patient_context=contexto_paciente_str,
+            question=question,
+            context=context_str,
+            patient_context=patient_context_str,
             rag_context=rag_context,
             pubmed_context=pubmed_context
         )
@@ -272,40 +323,41 @@ class SpecialistAgent:
 
             # Fallback: return a structured error response
             return {
-                "evaluacion": "Error parsing specialist response",
+                "evaluation": "Error parsing specialist response",
                 "evidence_used": [],
                 "clinical_reasoning": response_text,
-                "respuesta": "Error generating structured response",
-                "recomendaciones": [],
+                "response": "Error generating structured response",
+                "recommendations": [],
                 "evidence_level": "Unknown",
                 "requires_additional_info": False,
                 "additional_questions": []
             }
 
-    def _create_contrarreferencia(
+    def _create_counter_referral(
         self,
-        interconsulta_id: str,
+        interconsultation_id: str,
         response_data: Dict[str, Any]
     ) -> CounterReferralNote:
         """
         Create counter-referral note from response data.
 
         Args:
-            interconsulta_id: ID of the interconsultation
+            interconsultation_id: ID of the interconsultation
             response_data: Parsed response from Gemini
 
         Returns:
             Counter-referral note
         """
         return CounterReferralNote(
-            interconsulta_id=interconsulta_id,
+            interconsultation_id=interconsultation_id,
             specialty=self.specialty,
-            evaluacion=response_data.get('evaluacion', ''),
+            evaluation=response_data.get('evaluation', response_data.get('evaluacion', '')),
             evidence_used=response_data.get('evidence_used', []),
             clinical_reasoning=response_data.get('clinical_reasoning', ''),
-            respuesta=response_data.get('respuesta', ''),
-            recomendaciones=response_data.get('recomendaciones', []),
+            response=response_data.get('response', response_data.get('respuesta', '')),
+            recommendations=response_data.get('recommendations', response_data.get('recomendaciones', [])),
             evidence_level=response_data.get('evidence_level', 'Unknown'),
-            requires_additional_info=response_data.get('requires_additional_info', False),
-            additional_questions=response_data.get('additional_questions', [])
+            confidence_level=response_data.get('confidence_level', 'medium'),
+            information_limitations=response_data.get('information_limitations', []),
+            sources=self.sources
         )

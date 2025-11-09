@@ -1,76 +1,134 @@
 """
-LangGraph workflow for multi-agent medical consultation system.
+LangGraph workflow for multi-agent medical consultation system with event streaming.
 """
 import asyncio
-from typing import TypedDict, List, Dict, Any, Annotated
-from typing_extensions import TypedDict
+from typing import TypedDict, List, Dict, Any
 from langgraph.graph import StateGraph, END
-from langgraph.graph.message import add_messages
 
 from app.agents.general_practitioner import general_practitioner
 from app.agents.specialists import get_specialist_agent
 from app.models.consultation import (
-    EvaluacionGeneral,
+    GeneralEvaluation,
     InterconsultationNote,
     CounterReferralNote,
     PatientContext,
-    ClinicalRecord
+    ClinicalRecord,
+    InterrogationQuestion
 )
 from app.services.notes_service import notas_service
 from app.models.database import MedicalConsultation
+from app.core.event_emitter import event_emitter
+from app.models.events import (
+    GPInterrogatingEvent,
+    GPQuestionEvent,
+    GPEvaluatingEvent,
+    InterconsultationCreatedEvent,
+    SpecialistStartedEvent,
+    ToolStartedEvent,
+    ToolCompletedEvent,
+    SourceFoundEvent,
+    SpecialistCompletedEvent,
+    IntegratingEvent,
+    CompletedEvent
+)
 
 
 class MedicalConsultationState(TypedDict):
     """State for the medical consultation workflow"""
-
-    # Input
     original_consultation: str
     patient_context: Dict[str, Any]
     consulta_id: str
-
-    # GP evaluation
     general_evaluation: Dict[str, Any] | None
-
-    # Interconsultations
+    interrogation_questions: List[Dict[str, Any]]
+    user_responses: Dict[str, Any] | None
+    interrogation_completed: bool
     interconsultations: List[Dict[str, Any]]
     counter_referrals: List[Dict[str, Any]]
-
-    # Additional information
-    pending_questions: List[str]
-    additional_information: Dict[str, Any] | None
-
-    # Final output
     clinical_record: Dict[str, Any] | None
     final_response: str | None
-
-    # Control flow
-    estado: str  # evaluating, consulting, waiting_info, integrating, completed
+    status: str
     error: str | None
+
+
+async def interrogate_patient(state: MedicalConsultationState) -> MedicalConsultationState:
+    """
+    Node: GP interrogates patient to gather necessary information.
+    """
+    consulta_id = state['consulta_id']
+
+    await event_emitter.emit(GPInterrogatingEvent(
+        consulta_id=consulta_id,
+        data={
+            "phase": "interrogation",
+            "message": "GP gathering patient information"
+        }
+    ))
+
+    contexto = PatientContext(**state['patient_context'])
+
+    questions_data = await general_practitioner.generate_interrogation_questions(
+        consultation=state['original_consultation'],
+        patient_context=contexto
+    )
+
+    await event_emitter.emit(GPQuestionEvent(
+        consulta_id=consulta_id,
+        data={
+            "questions": questions_data.get('questions', []),
+            "reasoning": questions_data.get('reasoning', '')
+        }
+    ))
+
+    consulta_db = await MedicalConsultation.get(consulta_id)
+    if consulta_db:
+        consulta_db.interrogation_questions = [InterrogationQuestion(**q) for q in questions_data.get('questions', [])]
+        consulta_db.update_status('interrogating')
+        consulta_db.add_trace("interrogate_patient", {"question_count": len(questions_data.get('questions', []))})
+        await consulta_db.save()
+
+    state['interrogation_questions'] = questions_data.get('questions', [])
+    state['interrogation_completed'] = questions_data.get('can_proceed', False)
+    state['status'] = 'interrogating' if not questions_data.get('can_proceed', False) else 'evaluating'
+
+    return state
 
 
 async def evaluate_initial_consultation(state: MedicalConsultationState) -> MedicalConsultationState:
     """
     Node: General practitioner evaluates the consultation.
-
-    Args:
-        state: Current workflow state
-
-    Returns:
-        Updated state with evaluation
     """
-    print("🩺 GP: Evaluating consultation...")
+    consulta_id = state['consulta_id']
 
-    # Parse patient context
+    await event_emitter.emit(GPEvaluatingEvent(
+        consulta_id=consulta_id,
+        data={
+            "phase": "evaluation",
+            "message": "GP evaluating consultation"
+        }
+    ))
+
     contexto = PatientContext(**state['patient_context'])
 
-    # Evaluate
+    if state.get('user_responses'):
+        for key, value in state['user_responses'].items():
+            if key in contexto.model_fields:
+                setattr(contexto, key, value)
+
     evaluacion = await general_practitioner.evaluate_consultation(
         consultation=state['original_consultation'],
         patient_context=contexto
     )
 
-    # Update database
-    consulta_db = await MedicalConsultation.get(state['consulta_id'])
+    await event_emitter.emit(GPEvaluatingEvent(
+        consulta_id=consulta_id,
+        data={
+            "can_answer_directly": evaluacion.can_answer_directly,
+            "required_specialists": evaluacion.required_specialists,
+            "complexity": evaluacion.estimated_complexity
+        }
+    ))
+
+    consulta_db = await MedicalConsultation.get(consulta_id)
     if consulta_db:
         consulta_db.general_evaluation = evaluacion
         consulta_db.add_trace("evaluate_consultation", {
@@ -79,14 +137,13 @@ async def evaluate_initial_consultation(state: MedicalConsultationState) -> Medi
         })
         await consulta_db.save()
 
-    # Update state
     state['general_evaluation'] = evaluacion.model_dump()
 
     if evaluacion.can_answer_directly:
-        state['estado'] = 'completed'
-        state['final_response'] = evaluacion.respuesta_directa
+        state['status'] = 'completed'
+        state['final_response'] = evaluacion.direct_response if hasattr(evaluacion, 'direct_response') else ''
     else:
-        state['estado'] = 'consulting'
+        state['status'] = 'consulting'
 
     return state
 
@@ -94,22 +151,29 @@ async def evaluate_initial_consultation(state: MedicalConsultationState) -> Medi
 async def generate_interconsultations(state: MedicalConsultationState) -> MedicalConsultationState:
     """
     Node: Generate interconsultation notes for specialists.
-
-    Args:
-        state: Current workflow state
-
-    Returns:
-        Updated state with interconsultations
     """
-    print("📋 GP: Generating interconsultation notes...")
+    consulta_id = state['consulta_id']
 
-    evaluacion = EvaluacionGeneral(**state['general_evaluation'])
+    await event_emitter.emit(InterconsultationCreatedEvent(
+        consulta_id=consulta_id,
+        data={
+            "phase": "generating_interconsultations",
+            "message": "GP generating specialist notes"
+        }
+    ))
+
+    evaluacion = GeneralEvaluation(**state['general_evaluation'])
     contexto = PatientContext(**state['patient_context'])
 
     interconsultations = []
 
     for specialty in evaluacion.required_specialists:
-        print(f"  → Generating note for {specialty}")
+        await event_emitter.emit(InterconsultationCreatedEvent(
+            consulta_id=consulta_id,
+            data={
+                "specialty": specialty
+            }
+        ))
 
         interconsultation = await general_practitioner.generate_interconsulta(
             specialty=specialty,
@@ -119,14 +183,11 @@ async def generate_interconsultations(state: MedicalConsultationState) -> Medica
 
         interconsultations.append(interconsultation.model_dump())
 
-    # Update database
-    consulta_db = await MedicalConsultation.get(state['consulta_id'])
+    consulta_db = await MedicalConsultation.get(consulta_id)
     if consulta_db:
         for ic in interconsultations:
-            consulta_db.agregar_interconsulta(InterconsultationNote(**ic))
-        consulta_db.add_trace("generate_interconsultations", {
-            "count": len(interconsultations)
-        })
+            consulta_db.add_interconsultation(InterconsultationNote(**ic))
+        consulta_db.add_trace("generate_interconsultations", {"count": len(interconsultations)})
         await consulta_db.save()
 
     state['interconsultations'] = interconsultations
@@ -137,72 +198,90 @@ async def generate_interconsultations(state: MedicalConsultationState) -> Medica
 async def execute_specialists(state: MedicalConsultationState) -> MedicalConsultationState:
     """
     Node: Execute specialist agents in parallel.
-
-    Args:
-        state: Current workflow state
-
-    Returns:
-        Updated state with counter-referrals
     """
-    print("🔬 Executing specialist consultations in parallel...")
+    consulta_id = state['consulta_id']
+
+    await event_emitter.emit(SpecialistStartedEvent(
+        consulta_id=consulta_id,
+        data={
+            "phase": "specialist_consultation",
+            "message": "Specialists analyzing case"
+        }
+    ))
 
     contexto = PatientContext(**state['patient_context'])
 
-    # Execute all specialists in parallel
     async def process_interconsulta(interconsulta_data: Dict[str, Any]) -> Dict[str, Any]:
         interconsultation = InterconsultationNote(**interconsulta_data)
 
-        print(f"  → {interconsultation.specialty}: Processing...")
+        await event_emitter.emit(SpecialistStartedEvent(
+            consulta_id=consulta_id,
+            data={
+                "specialty": interconsultation.specialty
+            }
+        ))
 
-        # Get specialist agent
-        specialist = get_specialist_agent(interconsultation.specialty)
+        async def on_tool_start(tool_name: str, specialty: str):
+            await event_emitter.emit(ToolStartedEvent(
+                consulta_id=consulta_id,
+                data={
+                    "tool": tool_name,
+                    "specialty": specialty
+                }
+            ))
 
-        # Process interconsultation
-        counter_referral = await specialist.process_interconsulta(
-            interconsulta_id=interconsultation.id,
-            pregunta=interconsultation.specific_question,
-            contexto=interconsultation.relevant_context,
+        async def on_tool_complete(tool_name: str, specialty: str):
+            await event_emitter.emit(ToolCompletedEvent(
+                consulta_id=consulta_id,
+                data={
+                    "tool": tool_name,
+                    "specialty": specialty
+                }
+            ))
+
+        async def on_source_found(source):
+            await event_emitter.emit(SourceFoundEvent(
+                consulta_id=consulta_id,
+                data={
+                    "source": source.model_dump()
+                }
+            ))
+
+        specialist = get_specialist_agent(
+            interconsultation.specialty,
+            on_tool_start=on_tool_start,
+            on_tool_complete=on_tool_complete,
+            on_source_found=on_source_found
+        )
+
+        counter_referral = await specialist.process_interconsultation(
+            interconsultation_id=interconsultation.id,
+            question=interconsultation.specific_question,
+            context=interconsultation.relevant_context,
             patient_context=contexto
         )
 
-        print(f"  ✓ {interconsultation.specialty}: Response received")
+        await event_emitter.emit(SpecialistCompletedEvent(
+            consulta_id=consulta_id,
+            data={
+                "specialty": interconsultation.specialty
+            }
+        ))
 
         return counter_referral.model_dump()
 
-    # Execute in parallel
     tasks = [process_interconsulta(ic) for ic in state['interconsultations']]
     counter_referrals = await asyncio.gather(*tasks)
 
-    # Check if any specialist needs additional information
-    preguntas = []
-    for contra_data in counter_referrals:
-        contra = CounterReferralNote(**contra_data)
-        if contra.requires_additional_info:
-            preguntas.extend(contra.additional_questions)
-
-    # Update database
-    consulta_db = await MedicalConsultation.get(state['consulta_id'])
+    consulta_db = await MedicalConsultation.get(consulta_id)
     if consulta_db:
         for contra_data in counter_referrals:
-            consulta_db.agregar_contrarreferencia(CounterReferralNote(**contra_data))
-
-        if preguntas:
-            consulta_db.pending_questions = preguntas
-            consulta_db.actualizar_estado('esperando_info')
-
-        consulta_db.add_trace("execute_specialists", {
-            "count": len(counter_referrals),
-            "requires_additional_info": len(preguntas) > 0
-        })
+            consulta_db.add_counter_referral(CounterReferralNote(**contra_data))
+        consulta_db.add_trace("execute_specialists", {"count": len(counter_referrals)})
         await consulta_db.save()
 
     state['counter_referrals'] = counter_referrals
-    state['pending_questions'] = preguntas
-
-    if preguntas:
-        state['estado'] = 'waiting_info'
-    else:
-        state['estado'] = 'integrating'
+    state['status'] = 'integrating'
 
     return state
 
@@ -210,27 +289,31 @@ async def execute_specialists(state: MedicalConsultationState) -> MedicalConsult
 async def integrate_responses(state: MedicalConsultationState) -> MedicalConsultationState:
     """
     Node: Integrate specialist responses into final answer.
-
-    Args:
-        state: Current workflow state
-
-    Returns:
-        Updated state with integrated response
     """
-    print("🔄 GP: Integrating specialist responses...")
+    consulta_id = state['consulta_id']
+
+    await event_emitter.emit(IntegratingEvent(
+        consulta_id=consulta_id,
+        data={
+            "phase": "integration",
+            "message": "GP integrating specialist responses"
+        }
+    ))
 
     contexto = PatientContext(**state['patient_context'])
     counter_referrals = [CounterReferralNote(**c) for c in state['counter_referrals']]
 
-    # Integrate
     response_data = await general_practitioner.integrate_responses(
         consultation=state['original_consultation'],
         patient_context=contexto,
         counter_referrals=counter_referrals
     )
 
-    # Generate complete clinical record
     interconsultations = [InterconsultationNote(**ic) for ic in state['interconsultations']]
+
+    all_sources = []
+    for contra in counter_referrals:
+        all_sources.extend(contra.sources)
 
     expediente_text = notas_service.generar_expediente_completo(
         original_consultation=state['original_consultation'],
@@ -243,86 +326,72 @@ async def integrate_responses(state: MedicalConsultationState) -> MedicalConsult
         seguimiento=response_data.get('recommended_followup')
     )
 
-    # Create clinical_record object
     clinical_record = ClinicalRecord(
         general_summary=response_data.get('general_summary', ''),
         complete_notes=expediente_text,
         final_response=response_data.get('final_response', ''),
         management_plan=response_data.get('management_plan'),
-        recommended_followup=response_data.get('recommended_followup')
+        recommended_followup=response_data.get('recommended_followup'),
+        all_sources=all_sources
     )
 
-    # Update database
-    consulta_db = await MedicalConsultation.get(state['consulta_id'])
+    await event_emitter.emit(CompletedEvent(
+        consulta_id=consulta_id,
+        data={
+            "final_response": response_data.get('final_response', ''),
+            "sources_count": len(all_sources)
+        }
+    ))
+
+    consulta_db = await MedicalConsultation.get(consulta_id)
     if consulta_db:
         consulta_db.clinical_record = clinical_record
-        consulta_db.actualizar_estado('completado')
-        consulta_db.add_trace("integrate_responses", {
-            "expediente_generated": True
-        })
+        consulta_db.update_status('completed')
+        consulta_db.add_trace("integrate_responses", {"expediente_generated": True})
         await consulta_db.save()
 
     state['clinical_record'] = clinical_record.model_dump()
     state['final_response'] = response_data.get('final_response', '')
-    state['estado'] = 'completed'
-
-    print("✓ Integration complete!")
+    state['status'] = 'completed'
 
     return state
 
 
+def should_interrogate(state: MedicalConsultationState) -> str:
+    """Router: Decide if interrogation is needed."""
+    if state.get('interrogation_completed'):
+        return "evaluate"
+    return "interrogate"
+
+
 def should_consult_specialists(state: MedicalConsultationState) -> str:
-    """
-    Router: Decide if we need to consult specialists.
-
-    Args:
-        state: Current workflow state
-
-    Returns:
-        Next node name
-    """
+    """Router: Decide if we need to consult specialists."""
     if state['general_evaluation']['can_answer_directly']:
         return "end"
-    else:
-        return "generate_interconsultations"
-
-
-def should_wait_for_info(state: MedicalConsultationState) -> str:
-    """
-    Router: Decide if we need to wait for additional information.
-
-    Args:
-        state: Current workflow state
-
-    Returns:
-        Next node name
-    """
-    if state['pending_questions']:
-        return "wait_for_info"
-    else:
-        return "integrate"
+    return "generate_interconsultations"
 
 
 def create_workflow() -> StateGraph:
-    """
-    Create the medical consultation workflow graph.
-
-    Returns:
-        Compiled workflow
-    """
-    # Create graph
+    """Create the medical consultation workflow graph."""
     workflow = StateGraph(MedicalConsultationState)
 
-    # Add nodes
+    workflow.add_node("interrogate", interrogate_patient)
     workflow.add_node("evaluate", evaluate_initial_consultation)
     workflow.add_node("generate_interconsultations", generate_interconsultations)
     workflow.add_node("execute_specialists", execute_specialists)
     workflow.add_node("integrate", integrate_responses)
 
-    # Set entry point
-    workflow.set_entry_point("evaluate")
+    workflow.set_entry_point("interrogate")
 
-    # Add edges
+    workflow.add_conditional_edges(
+        "interrogate",
+        should_interrogate,
+        {
+            "interrogate": END,
+            "evaluate": "evaluate"
+        }
+    )
+
     workflow.add_conditional_edges(
         "evaluate",
         should_consult_specialists,
@@ -333,23 +402,12 @@ def create_workflow() -> StateGraph:
     )
 
     workflow.add_edge("generate_interconsultations", "execute_specialists")
-
-    workflow.add_conditional_edges(
-        "execute_specialists",
-        should_wait_for_info,
-        {
-            "integrate": "integrate",
-            "wait_for_info": END  # Will be handled by API
-        }
-    )
-
+    workflow.add_edge("execute_specialists", "integrate")
     workflow.add_edge("integrate", END)
 
-    # Compile
     app = workflow.compile()
 
     return app
 
 
-# Global workflow instance
 medical_consultation_workflow = create_workflow()

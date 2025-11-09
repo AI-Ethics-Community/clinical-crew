@@ -3,15 +3,16 @@ Data models for the application.
 """
 from app.models.consultation import (
     PatientContext,
-    ConsultaCreate as ConsultationCreate,
-    InformacionAdicional as AdditionalInformation,
-    EvaluacionGeneral as GeneralEvaluation,
+    ConsultationCreate,
+    AdditionalInformation,
+    GeneralEvaluation,
     InterconsultationNote,
     CounterReferralNote,
     ClinicalRecord,
-    EstadoConsulta as ConsultationStatus,
-    ConsultaResponse as ConsultationResponse,
-    ConsultaCompleta as CompleteConsultation,
+    ConsultationStatus,
+    ConsultationResponse,
+    CompleteConsultation,
+    InterrogationQuestion,
 )
 
 from app.models.notes import (
@@ -28,6 +29,28 @@ from app.models.database import (
     init_db,
 )
 
+from app.models.sources import (
+    ScientificSource,
+    SourceType,
+)
+
+from app.models.events import (
+    BaseStreamEvent,
+    GPInterrogatingEvent,
+    GPQuestionEvent,
+    GPEvaluatingEvent,
+    InterconsultationCreatedEvent,
+    SpecialistStartedEvent,
+    ToolStartedEvent,
+    ToolCompletedEvent,
+    SourceFoundEvent,
+    SpecialistCompletedEvent,
+    IntegratingEvent,
+    CompletedEvent,
+    ErrorEvent,
+    StreamEvent,
+)
+
 __all__ = [
     # Consultation
     "PatientContext",
@@ -40,6 +63,7 @@ __all__ = [
     "ConsultationStatus",
     "ConsultationResponse",
     "CompleteConsultation",
+    "InterrogationQuestion",
     # Notes
     "InterconsultationNoteTemplate",
     "CounterReferralNoteTemplate",
@@ -50,4 +74,22 @@ __all__ = [
     "DocumentoRAG",
     "BusquedaPubMed",
     "init_db",
+    # Sources
+    "ScientificSource",
+    "SourceType",
+    # Events
+    "BaseStreamEvent",
+    "GPInterrogatingEvent",
+    "GPQuestionEvent",
+    "GPEvaluatingEvent",
+    "InterconsultationCreatedEvent",
+    "SpecialistStartedEvent",
+    "ToolStartedEvent",
+    "ToolCompletedEvent",
+    "SourceFoundEvent",
+    "SpecialistCompletedEvent",
+    "IntegratingEvent",
+    "CompletedEvent",
+    "ErrorEvent",
+    "StreamEvent",
 ]

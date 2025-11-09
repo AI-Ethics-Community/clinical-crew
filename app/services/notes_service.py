@@ -73,13 +73,13 @@ class NotasService:
         """
         plantilla = PlantillaNotaContrarreferencia(
             specialty=counter_referral.specialty,
-            evaluacion=counter_referral.evaluacion,
-            evidencia_consultada=counter_referral.evidence_used,
+            evaluation=counter_referral.evaluation,
+            evidence_consulted=counter_referral.evidence_used,
             clinical_reasoning=counter_referral.clinical_reasoning,
-            respuesta=counter_referral.respuesta,
-            recomendaciones=counter_referral.recomendaciones,
+            response=counter_referral.response,
+            recommendations=counter_referral.recommendations,
             evidence_level=counter_referral.evidence_level,
-            informacion_adicional_requerida=(
+            additional_information_required=(
                 counter_referral.additional_questions
                 if counter_referral.requires_additional_info
                 else None
@@ -125,7 +125,7 @@ class NotasService:
             # Buscar counter_referral correspondiente
             contra = None
             for c in counter_referrals:
-                if c.interconsulta_id == interconsultation.id:
+                if c.interconsultation_id == interconsultation.id:
                     contra = c
                     break
 
