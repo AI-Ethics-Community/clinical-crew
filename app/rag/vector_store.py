@@ -1,6 +1,7 @@
 """
-Vector Store usando ChromaDB.
+Vector Store using ChromaDB.
 """
+
 import chromadb
 from chromadb.config import Settings as ChromaSettings
 from typing import List, Dict, Any, Optional
@@ -11,54 +12,61 @@ from app.rag.embeddings import GeminiEmbeddings
 
 
 class VectorStore:
-    """Wrapper para ChromaDB con Gemini embeddings"""
+    """Wrapper for ChromaDB with Gemini embeddings"""
 
     def __init__(self, persist_directory: Optional[str] = None):
         """
-        Inicializa el vector store.
+        Initialize the vector store.
 
         Args:
-            persist_directory: Directorio de persistencia (usa settings por defecto)
+            persist_directory: Persistence directory (uses settings default if not provided)
         """
         self.persist_directory = persist_directory or settings.chroma_persist_directory
 
-        # Crear directorio si no existe
+        # Create directory if it doesn't exist
         Path(self.persist_directory).mkdir(parents=True, exist_ok=True)
 
-        # Inicializar ChromaDB
+        # Initialize ChromaDB
         self.client = chromadb.PersistentClient(
             path=self.persist_directory,
             settings=ChromaSettings(
                 anonymized_telemetry=False,
                 allow_reset=True,
-                chroma_telemetry_impl="none"  # Disable telemetry to avoid capture() argument error
-            )
+                chroma_telemetry_impl="none",  # Disable telemetry to avoid capture() argument error
+            ),
         )
 
-        # Inicializar embeddings
+        # Initialize embeddings
         self.embeddings = GeminiEmbeddings()
 
     def get_or_create_collection(self, name: str, metadata: Optional[Dict] = None):
         """
-        Obtiene o crea una colección.
+        Get or create a collection.
 
         Args:
-            name: Nombre de la colección
-            metadata: Metadata de la colección
+            name: Collection name (specialty name without prefix)
+            metadata: Collection metadata
 
         Returns:
-            Colección de ChromaDB
+            ChromaDB collection
         """
-        collection_name = f"{settings.chroma_collection_prefix}_{name}"
+        # Normalize collection name - avoid double prefix
+        if name.startswith(f"{settings.chroma_collection_prefix}_"):
+            # Already has prefix, use as-is
+            collection_name = name
+            specialty_name = name.replace(f"{settings.chroma_collection_prefix}_", "")
+        else:
+            # Add prefix
+            collection_name = f"{settings.chroma_collection_prefix}_{name}"
+            specialty_name = name
 
         try:
             collection = self.client.get_collection(name=collection_name)
         except Exception:
             # ChromaDB requires at least one metadata field
-            collection_metadata = metadata or {"specialty": name}
+            collection_metadata = metadata or {"specialty": specialty_name}
             collection = self.client.create_collection(
-                name=collection_name,
-                metadata=collection_metadata
+                name=collection_name, metadata=collection_metadata
             )
 
         return collection
@@ -68,28 +76,29 @@ class VectorStore:
         collection_name: str,
         documents: List[str],
         metadatas: List[Dict[str, Any]],
-        ids: List[str]
+        ids: List[str],
     ):
         """
-        Agrega documentos a una colección.
+        Add documents to a collection.
 
         Args:
-            collection_name: Nombre de la colección
-            documents: Lista de textos
-            metadatas: Lista de metadatos
-            ids: Lista de IDs únicos
+            collection_name: Collection name
+            documents: List of texts
+            metadatas: List of metadata
+            ids: List of unique IDs
         """
         collection = self.get_or_create_collection(collection_name)
 
-        # Generar embeddings
+        # Generate embeddings
         embeddings = self.embeddings.embed_documents(documents)
 
-        # Agregar a la colección
+        # Add to collection
+        # Type ignore: ChromaDB's type stubs don't match actual implementation
         collection.add(
-            embeddings=embeddings,
+            embeddings=embeddings,  # type: ignore[arg-type]
             documents=documents,
-            metadatas=metadatas,
-            ids=ids
+            metadatas=metadatas,  # type: ignore[arg-type]
+            ids=ids,
         )
 
     def query(
@@ -97,68 +106,69 @@ class VectorStore:
         collection_name: str,
         query_text: str,
         n_results: int = 5,
-        where: Optional[Dict[str, Any]] = None
+        where: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
-        Realiza una búsqueda en la colección.
+        Perform a search in the collection.
 
         Args:
-            collection_name: Nombre de la colección
-            query_text: Texto de búsqueda
-            n_results: Número de resultados
-            where: Filtros de metadata
+            collection_name: Collection name
+            query_text: Search text
+            n_results: Number of results
+            where: Metadata filters
 
         Returns:
-            Resultados de la búsqueda
+            Search results
         """
         collection = self.get_or_create_collection(collection_name)
 
-        # Generar embedding de la query
+        # Generate query embedding
         query_embedding = self.embeddings.embed_query(query_text)
 
-        # Realizar búsqueda
+        # Perform search
+        # Type ignore: ChromaDB's type stubs don't match actual implementation
         results = collection.query(
-            query_embeddings=[query_embedding],
+            query_embeddings=[query_embedding],  # type: ignore[arg-type]
             n_results=n_results,
-            where=where
+            where=where,
         )
 
-        return results
+        return results  # type: ignore[return-value]
 
     def delete_collection(self, collection_name: str):
         """
-        Elimina una colección.
+        Delete a collection.
 
         Args:
-            collection_name: Nombre de la colección
+            collection_name: Collection name
         """
         full_name = f"{settings.chroma_collection_prefix}_{collection_name}"
         self.client.delete_collection(name=full_name)
 
     def get_collection_stats(self, collection_name: str) -> Dict[str, Any]:
         """
-        Obtiene estadísticas de una colección.
+        Get collection statistics.
 
         Args:
-            collection_name: Nombre de la colección
+            collection_name: Collection name
 
         Returns:
-            Estadísticas de la colección
+            Collection statistics
         """
         collection = self.get_or_create_collection(collection_name)
 
         return {
             "name": collection.name,
             "count": collection.count(),
-            "metadata": collection.metadata
+            "metadata": collection.metadata,
         }
 
     def list_collections(self) -> List[str]:
         """
-        Lista todas las colecciones.
+        List all collections.
 
         Returns:
-            Lista de nombres de colecciones
+            List of collection names
         """
         collections = self.client.list_collections()
         return [col.name for col in collections]
@@ -168,41 +178,42 @@ class VectorStore:
         collection_name: str,
         document_id: str,
         document: str,
-        metadata: Dict[str, Any]
+        metadata: Dict[str, Any],
     ):
         """
-        Actualiza un documento en la colección.
+        Update a document in the collection.
 
         Args:
-            collection_name: Nombre de la colección
-            document_id: ID del documento
-            document: Nuevo texto
-            metadata: Nueva metadata
+            collection_name: Collection name
+            document_id: Document ID
+            document: New text
+            metadata: New metadata
         """
         collection = self.get_or_create_collection(collection_name)
 
-        # Generar nuevo embedding
+        # Generate new embedding
         embedding = self.embeddings.embed_documents([document])[0]
 
-        # Actualizar
+        # Update
+        # Type ignore: ChromaDB's type stubs don't match actual implementation
         collection.update(
             ids=[document_id],
-            embeddings=[embedding],
+            embeddings=[embedding],  # type: ignore[arg-type]
             documents=[document],
-            metadatas=[metadata]
+            metadatas=[metadata],  # type: ignore[list-item]
         )
 
     def delete_document(self, collection_name: str, document_id: str):
         """
-        Elimina un documento de la colección.
+        Delete a document from the collection.
 
         Args:
-            collection_name: Nombre de la colección
-            document_id: ID del documento
+            collection_name: Collection name
+            document_id: Document ID
         """
         collection = self.get_or_create_collection(collection_name)
         collection.delete(ids=[document_id])
 
 
-# Instancia global del vector store
+# Global vector store instance
 vector_store = VectorStore()
