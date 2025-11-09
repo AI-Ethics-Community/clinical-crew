@@ -174,11 +174,15 @@ class GeneralPractitionerAgent:
         # Format counter-referrals
         contrarreferencias_str = self._format_contrarreferencias(counter_referrals)
 
+        # Format scientific sources from all counter-referrals
+        sources_str = self._format_scientific_sources(counter_referrals)
+
         # Build prompt
         prompt = PROMPT_INTEGRAR_RESPUESTAS.format(
             consultation=consultation,
             patient_context=contexto_str,
             counter_referrals=contrarreferencias_str,
+            scientific_sources=sources_str,
         )
 
         # Generate integration
@@ -273,6 +277,63 @@ class GeneralPractitionerAgent:
         response_data = self._parse_json_response(response_text)
 
         return response_data
+
+    def _format_scientific_sources(
+        self, counter_referrals: List[CounterReferralNote]
+    ) -> str:
+        """
+        Format scientific sources from all counter-referrals.
+
+        Args:
+            counter_referrals: List of counter-referrals with sources
+
+        Returns:
+            Formatted scientific sources text
+        """
+        from app.models.sources import ScientificSource, SourceType
+
+        all_sources = []
+        for contra in counter_referrals:
+            all_sources.extend(contra.sources)
+
+        if not all_sources:
+            return "No se consultaron fuentes científicas específicas para esta evaluación."
+
+        # Group sources by type
+        pubmed_sources = [s for s in all_sources if s.source_type == SourceType.PUBMED]
+        rag_sources = [s for s in all_sources if s.source_type in [SourceType.RAG_GUIDELINE, SourceType.RAG_TEXTBOOK]]
+
+        formatted_parts = []
+
+        # Format PubMed sources
+        if pubmed_sources:
+            formatted_parts.append("## Artículos de PubMed:")
+            for i, source in enumerate(pubmed_sources[:10], 1):  # Limit to top 10
+                authors_str = ", ".join(source.authors[:3]) if source.authors else "Unknown authors"
+                if len(source.authors) > 3:
+                    authors_str += " et al."
+
+                year = f"({source.publication_year})" if source.publication_year else ""
+                pmid = f"PMID: {source.pmid}" if source.pmid else ""
+
+                source_text = f"{i}. {source.title} {year}\n   {authors_str}\n   {pmid}"
+                if source.url:
+                    source_text += f"\n   URL: {source.url}"
+
+                formatted_parts.append(source_text)
+
+        # Format RAG sources (Guidelines, Textbooks)
+        if rag_sources:
+            formatted_parts.append("\n## Guías Clínicas y Literatura Especializada:")
+            for i, source in enumerate(rag_sources[:10], 1):  # Limit to top 10
+                source_text = f"{i}. {source.title}"
+                if hasattr(source, 'metadata') and source.metadata:
+                    specialty = source.metadata.get('specialty', '')
+                    if specialty:
+                        source_text += f" (Specialty: {specialty})"
+                formatted_parts.append(source_text)
+
+        return "\n".join(formatted_parts)
 
     def _format_contrarreferencias(
         self, counter_referrals: List[CounterReferralNote]

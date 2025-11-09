@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 class SourceType(str, Enum):
     """Tipos de fuentes científicas"""
     PUBMED = "pubmed"
+    RAG = "rag"
     RAG_GUIDELINE = "rag_guideline"
     RAG_TEXTBOOK = "rag_textbook"
     CLINICAL_TRIAL = "clinical_trial"
@@ -17,7 +18,7 @@ class SourceType(str, Enum):
 
 class ScientificSource(BaseModel):
     """Fuente científica utilizada en una evaluación"""
-    source_id: str = Field(..., description="ID único de la fuente")
+    source_id: str = Field(default_factory=lambda: f"src_{datetime.utcnow().timestamp()}", description="ID único de la fuente")
     source_type: SourceType = Field(..., description="Tipo de fuente")
     title: str = Field(..., description="Título del documento/artículo")
     url: Optional[str] = Field(None, description="URL de la fuente")
@@ -25,10 +26,14 @@ class ScientificSource(BaseModel):
     doi: Optional[str] = Field(None, description="DOI")
     authors: Optional[List[str]] = Field(default_factory=list, description="Autores")
     publication_year: Optional[int] = Field(None, description="Año de publicación")
+    publication_date: Optional[str] = Field(None, description="Fecha de publicación completa")
     abstract: Optional[str] = Field(None, description="Abstract/resumen")
-    relevance_score: float = Field(..., description="Puntuación de relevancia (0-1)", ge=0.0, le=1.0)
-    specialty: str = Field(..., description="Especialidad que utilizó la fuente")
-    used_for: str = Field(..., description="Descripción de cómo se utilizó")
+    content: Optional[str] = Field(None, description="Contenido o extracto del documento")
+    journal: Optional[str] = Field(None, description="Journal/revista de publicación")
+    metadata: Optional[dict] = Field(default_factory=dict, description="Metadata adicional")
+    relevance_score: float = Field(default=0.8, description="Puntuación de relevancia (0-1)", ge=0.0, le=1.0)
+    specialty: str = Field(default="general", description="Especialidad que utilizó la fuente")
+    used_for: str = Field(default="", description="Descripción de cómo se utilizó")
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     
     class Config:

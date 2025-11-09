@@ -94,6 +94,9 @@ CONTEXTO DEL PACIENTE:
 RESPUESTAS DE ESPECIALISTAS:
 {counter_referrals}
 
+FUENTES CIENTÍFICAS CONSULTADAS:
+{scientific_sources}
+
 TU TAREA:
 Integra las evaluaciones de los especialistas y genera una respuesta final completa que responda DIRECTAMENTE la pregunta del usuario.
 
@@ -104,6 +107,7 @@ DEBES:
 4. Proporcionar conclusiones claras y accionables
 5. Dar un plan de manejo integrado y priorizado
 6. Incluir recomendaciones de seguimiento específicas
+7. **CITAR las fuentes científicas relevantes** que respaldan tus conclusiones
 
 ESTRUCTURA DE LA RESPUESTA FINAL:
 - **Respuesta directa a la pregunta**: Comienza respondiendo explícitamente lo que el usuario preguntó
@@ -111,21 +115,30 @@ ESTRUCTURA DE LA RESPUESTA FINAL:
 - **Conclusión integrada**: Une las recomendaciones en una conclusión coherente
 - **Plan de acción**: Pasos concretos y priorizados
 - **Seguimiento**: Qué hacer después y cuándo
+- **Referencias bibliográficas**: Menciona las fuentes científicas clave en la respuesta
+
+IMPORTANTE SOBRE REFERENCIAS:
+- Integra las citas de forma NATURAL en tu respuesta (no como lista aparte)
+- Menciona guías clínicas, estudios de PubMed u otras fuentes cuando refuerces puntos clave
+- Ejemplo: "De acuerdo con las guías de la ADA 2024, el control glucémico durante el embarazo..."
+- Ejemplo: "Estudios recientes en PubMed (PMID: 12345678) demuestran que..."
+- NO necesitas citar TODAS las fuentes, solo las más relevantes para tu conclusión
 
 IMPORTANTE:
 - El campo "final_response" debe ser una respuesta COMPLETA y CLARA que el usuario pueda entender
 - NO repitas solo lo que dijeron los especialistas, INTERPRETA y SINTETIZA
 - Asegúrate de que un paciente pueda leer tu respuesta y saber exactamente qué hacer
+- Las referencias deben estar integradas naturalmente en el texto, no como anexo separado
 
 RESPONDE EN EL SIGUIENTE FORMATO JSON:
 {{
     "general_summary": "Resumen ejecutivo de toda la evaluación multidisciplinaria",
-    "final_response": "RESPUESTA COMPLETA Y DETALLADA que responde la pregunta original, integra todas las evaluaciones de especialistas, y proporciona conclusiones claras. Esta debe ser una respuesta que el usuario pueda leer y comprender completamente.",
+    "final_response": "RESPUESTA COMPLETA Y DETALLADA que responde la pregunta original, integra todas las evaluaciones de especialistas, y proporciona conclusiones claras. INCLUYE referencias a las fuentes científicas de forma natural en el texto (ej: 'Según las guías ADA 2024...', 'Estudios recientes PMID:xxxxx muestran...'). Esta debe ser una respuesta que el usuario pueda leer y comprender completamente.",
     "management_plan": ["Paso 1: Acción específica", "Paso 2: Siguiente acción", "Paso 3: Seguimiento"],
     "recommended_followup": "Recomendaciones específicas de seguimiento con plazos"
 }}
 
-Proporciona una respuesta profesional, integral y práctica que sintetice todas las evaluaciones en una conclusión útil para el usuario.
+Proporciona una respuesta profesional, integral y práctica que sintetice todas las evaluaciones en una conclusión útil para el usuario, respaldada por evidencia científica.
 """
 
 
