@@ -30,7 +30,8 @@ class VectorStore:
             path=self.persist_directory,
             settings=ChromaSettings(
                 anonymized_telemetry=False,
-                allow_reset=True
+                allow_reset=True,
+                chroma_telemetry_impl="none"  # Disable telemetry to avoid capture() argument error
             )
         )
 

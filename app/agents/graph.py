@@ -141,7 +141,7 @@ async def evaluate_initial_consultation(state: MedicalConsultationState) -> Medi
 
     if evaluacion.can_answer_directly:
         state['status'] = 'completed'
-        state['final_response'] = evaluacion.direct_response if hasattr(evaluacion, 'direct_response') else ''
+        state['final_response'] = evaluacion.reasoning
     else:
         state['status'] = 'consulting'
 
@@ -411,3 +411,35 @@ def create_workflow() -> StateGraph:
 
 
 medical_consultation_workflow = create_workflow()
+
+
+def create_workflow_from_evaluation() -> StateGraph:
+    """Create workflow that starts from evaluation phase (after interrogation)."""
+    workflow = StateGraph(MedicalConsultationState)
+
+    workflow.add_node("evaluate", evaluate_initial_consultation)
+    workflow.add_node("generate_interconsultations", generate_interconsultations)
+    workflow.add_node("execute_specialists", execute_specialists)
+    workflow.add_node("integrate", integrate_responses)
+
+    workflow.set_entry_point("evaluate")
+
+    workflow.add_conditional_edges(
+        "evaluate",
+        should_consult_specialists,
+        {
+            "generate_interconsultations": "generate_interconsultations",
+            "end": END
+        }
+    )
+
+    workflow.add_edge("generate_interconsultations", "execute_specialists")
+    workflow.add_edge("execute_specialists", "integrate")
+    workflow.add_edge("integrate", END)
+
+    app = workflow.compile()
+
+    return app
+
+
+medical_consultation_workflow_from_evaluation = create_workflow_from_evaluation()

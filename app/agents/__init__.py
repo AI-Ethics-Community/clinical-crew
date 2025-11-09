@@ -13,8 +13,12 @@ from app.agents.graph import (
     create_workflow
 )
 
+# Alias for backwards compatibility with tests
+GeneralPractitioner = GeneralPractitionerAgent
+
 __all__ = [
     "GeneralPractitionerAgent",
+    "GeneralPractitioner",
     "general_practitioner",
     "SpecialistAgent",
     "get_specialist_agent",

@@ -19,7 +19,8 @@ RULES:
 2. Each question must be clear and specific
 3. Prioritize: 1 (most critical) to 5 (important but not critical)
 4. Identify type: "open" (free text), "numeric" (number), "multiple_choice" (options)
-5. DO NOT generate questions if the information is already available
+5. For "multiple_choice" questions, you MUST include an "options" array with 2-5 possible answers
+6. DO NOT generate questions if the information is already available
 
 RESPOND IN JSON FORMAT:
 {{
@@ -30,11 +31,21 @@ RESPOND IN JSON FORMAT:
             "question_type": "numeric",
             "priority": 1,
             "context": "Needed to assess glycemic control"
+        }},
+        {{
+            "question_id": "q2",
+            "question_text": "Has the patient experienced hypoglycemic episodes?",
+            "question_type": "multiple_choice",
+            "priority": 2,
+            "context": "Important for treatment safety assessment",
+            "options": ["Yes, frequently (>3 per week)", "Yes, occasionally (1-3 per week)", "Rarely (<1 per week)", "Never"]
         }}
     ],
     "can_proceed": false,
     "reasoning": "I need additional information about..."
 }}
+
+IMPORTANT: For every question with "question_type": "multiple_choice", the "options" field is REQUIRED and must contain at least 2 options.
 """
 
 PROMPT_EVALUATE_RESPONSES = """

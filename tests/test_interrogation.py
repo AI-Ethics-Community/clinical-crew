@@ -5,13 +5,12 @@ import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from datetime import datetime
 
-from app.agents.general_practitioner import GeneralPractitioner
+from app.agents import GeneralPractitioner, MedicalConsultationState
 from app.models.consultation import (
     InterrogationQuestion,
     PatientContext,
     ConsultationStatus,
 )
-from app.agents.state import MedicalConsultationState
 
 
 @pytest.fixture
@@ -39,7 +38,7 @@ def consultation_state(patient_context):
         consulta_id="test-123",
         original_consultation="Patient complains of chest pain for 3 days",
         patient_context=patient_context,
-        estado=ConsultationStatus.INTERROGANDO
+        estado=ConsultationStatus.INTERROGATING
     )
 
 

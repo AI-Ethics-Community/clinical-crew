@@ -35,10 +35,9 @@ ESPECIALISTAS DISPONIBLES:
 RESPONDE EN EL SIGUIENTE FORMATO JSON:
 {{
     "can_answer_directly": true/false,
-    "razonamiento": "Explicación de tu decisión",
+    "reasoning": "Explicación de tu decisión",
     "estimated_complexity": 0.0-1.0,
-    "required_specialists": ["Cardiología", "Endocrinología"],  // si aplica
-    "respuesta_directa": "Tu respuesta si can_answer_directly es true"
+    "required_specialists": ["Cardiología", "Endocrinología"]  // si aplica
 }}
 
 Sé específico y fundamentado en tu evaluación.

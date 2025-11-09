@@ -78,10 +78,6 @@ class GeneralPractitionerAgent:
             estimated_complexity=response_data.get("estimated_complexity", 0.5),
         )
 
-        # Store direct response if applicable
-        if evaluacion.can_answer_directly:
-            evaluacion.direct_response = response_data.get("direct_response", response_data.get("respuesta_directa", ""))
-
         return evaluacion
 
     async def generate_interconsulta(
@@ -207,6 +203,16 @@ class GeneralPractitionerAgent:
 
         response_text = await self.gemini_client.generate_content_async(prompt)
         response_data = self._parse_json_response(response_text)
+
+        # Validate that multiple_choice questions have options
+        if "questions" in response_data:
+            for question in response_data["questions"]:
+                if question.get("question_type") == "multiple_choice":
+                    if not question.get("options") or len(question.get("options", [])) < 2:
+                        print(f"WARNING: multiple_choice question '{question.get('question_id')}' missing valid options. "
+                              f"Converting to 'open' type.")
+                        question["question_type"] = "open"
+                        question.pop("options", None)
 
         return response_data
 

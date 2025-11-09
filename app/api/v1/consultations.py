@@ -13,7 +13,7 @@ from app.models.consultation import (
 )
 from app.models.sources import ScientificSource
 from app.models.database import MedicalConsultation
-from app.agents.graph import medical_consultation_workflow, MedicalConsultationState
+from app.agents.graph import medical_consultation_workflow, medical_consultation_workflow_from_evaluation, MedicalConsultationState
 
 router = APIRouter()
 
@@ -166,7 +166,7 @@ async def respond_to_interrogation(consultation_id: str, response: Interrogation
     }
 
     try:
-        final_state = await medical_consultation_workflow.ainvoke(resume_state)
+        final_state = await medical_consultation_workflow_from_evaluation.ainvoke(resume_state)
 
         if final_state.get('status') == 'completed':
             consultation = await MedicalConsultation.get(consultation.id)

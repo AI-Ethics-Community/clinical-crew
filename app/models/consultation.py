@@ -43,6 +43,7 @@ class InterrogationQuestion(BaseModel):
     question_type: Literal["open", "numeric", "multiple_choice"] = Field(..., description="Question type")
     priority: int = Field(..., ge=1, le=5, description="Priority (1=most critical, 5=important)")
     context: Optional[str] = Field(None, description="Context for why this question is being asked")
+    options: Optional[List[str]] = Field(None, description="Answer options for multiple_choice questions")
 
 
 class ConsultationCreate(BaseModel):
