@@ -16,9 +16,17 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
+# Copiar scripts de setup
+COPY ./scripts ./scripts
+RUN chmod +x scripts/*.sh scripts/*.py
+
 # Copiar configuración y archivos de aplicación
 COPY ./app ./app
 COPY ./data ./data
+
+# Copiar backup de vectorstore si existe
+COPY vectorstore-backup.tar.g[z] ./ 2>/dev/null || true
+COPY vectorstore-backup.tar.gz.sha25[6] ./ 2>/dev/null || true
 
 # Crear directorios necesarios
 RUN mkdir -p /app/logs && \

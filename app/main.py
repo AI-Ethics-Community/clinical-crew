@@ -31,10 +31,18 @@ async def lifespan(app: FastAPI):
 
     # Initialize MongoDB connection
     print(f"📊 Connecting to MongoDB: {settings.mongodb_url}")
+
+    # SSL/TLS configuration for MongoDB Atlas
+    import certifi
+
     dependencies.mongodb_client = AsyncIOMotorClient(
         settings.mongodb_url,
         maxPoolSize=settings.mongodb_max_connections,
         minPoolSize=settings.mongodb_min_connections,
+        tlsCAFile=certifi.where(),  # Use certifi CA bundle for SSL/TLS
+        serverSelectionTimeoutMS=30000,  # 30 second timeout
+        connectTimeoutMS=30000,
+        socketTimeoutMS=30000,
     )
 
     # Initialize Beanie
