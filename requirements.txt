@@ -49,6 +49,7 @@ email-validator==2.2.0
 # ============================================================================
 python-dotenv==1.0.1
 pyyaml==6.0.2
+agentcard==0.1.1  # Agent Cards documentation standard
 
 # ============================================================================
 # Document Processing (for RAG)

@@ -79,6 +79,33 @@ El sistema implementa un flujo de trabajo multi-agente sofisticado usando LangGr
 - Configuración basada en archivos
 - Sistema de plugins para herramientas específicas
 
+### 📋 Documentación con Agent Cards
+
+Clinical Crew implementa el estándar **Agent Cards** para transparencia y documentación de agentes de IA:
+
+- **Estándar**: MICAI 2025 Workshops (Springer LNAI) - [Repositorio Agent Cards](https://github.com/CarlosUrteaga/agentcard)
+- **Propósito**: Documentación estructurada de capacidades, herramientas, gobernanza y riesgos de los agentes
+- **Cobertura**: Todos los agentes (MG + 3 Especialistas) tienen Agent Cards completas
+- **Beneficios**: Transparencia, reproducibilidad, gobernanza, gestión de riesgos, auditabilidad
+
+**Documentación Clave**:
+- Roles y capacidades de los agentes
+- Configuración de LLM (modelo, versión, temperatura)
+- Herramientas y funciones con definiciones de alcance
+- Políticas de seguridad y reglas de gobernanza
+- Identificación y mitigación de riesgos
+- Métricas de evaluación y KPIs
+
+**Crédito a los Creadores**:
+```
+Urteaga-Reyesvera, J. C., & Lopez Murphy, J. J. (2025).
+Agent Cards: A Documentation Standard for Operational AI Agents.
+In MICAI 2025 Workshops (Lecture Notes in Artificial Intelligence).
+Springer Nature Switzerland AG.
+```
+
+Ver [AGENT_CARDS.md](AGENT_CARDS.md) para documentación completa.
+
 ## Arquitectura Técnica
 
 ### Stack Tecnológico
