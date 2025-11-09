@@ -1,0 +1,265 @@
+agentcard: "1.0"
+
+meta:
+  name: "Cardiology Specialist Agent"
+  version: "1.0.0"
+  owner: "AI Ethics Community - Clinical Crew"
+  last_updated: "2025-11-09"
+  repository: "https://github.com/AI-Ethics-Community/clinical-crew"
+  license: "BSD-2-Clause"
+
+purpose:
+  objective: "Provide expert cardiology consultation for complex cardiovascular cases, utilizing RAG knowledge base and PubMed literature to generate evidence-based counter-referral notes"
+  users: ["General Practitioner Agent", "Medical Professionals", "Healthcare AI Systems"]
+  domain: "Cardiology / Cardiovascular Medicine"
+
+agent_version: "1.0"
+agent_name: "CardiologySpecialistAgent"
+agent_role:
+  - "Medical Specialist"
+  - "Evidence Synthesizer"
+  - "Clinical Advisor"
+
+interface:
+  inputs:
+    - "Interconsultation note (InterconsultationNote)"
+    - "Specific clinical question"
+    - "Patient context (PatientContext)"
+    - "Relevant clinical context dictionary"
+  outputs:
+    - "Counter-referral note (CounterReferralNote)"
+    - "Evidence-based evaluation"
+    - "Clinical recommendations with evidence level"
+    - "Scientific sources (RAG + PubMed)"
+
+memory:
+  short_term: "Current interconsultation context, retrieved RAG documents, PubMed articles for active case"
+  long_term:
+    type: "ChromaDB vector store (RAG) + MongoDB (consultation history)"
+    rag_collection: "cardiology_kb"
+    data_sources:
+      - "Clinical practice guidelines (ACC/AHA, ESC)"
+      - "Cardiology textbooks"
+      - "Evidence-based protocols"
+    retention: "Permanent knowledge base; consultation history per MongoDB settings"
+
+tools_functions:
+  - name: "gemini_especialista"
+    type: "LLM (Google Gemini Flash)"
+    purpose: "Generate specialist clinical responses based on evidence"
+    scope: "Cardiology clinical reasoning, evidence synthesis"
+    temperature: 0.05
+    model: "models/gemini-2.5-pro"
+
+  - name: "rag_retrieval"
+    type: "Vector Semantic Search"
+    purpose: "Retrieve relevant cardiology knowledge from RAG knowledge base"
+    scope: "read-only access to cardiology_kb collection"
+    top_k: 5
+    source_types: ["RAG_GUIDELINE", "RAG_TEXTBOOK"]
+    eligibility: "All interconsultation questions"
+
+  - name: "pubmed_search"
+    type: "Medical Literature Search"
+    purpose: "Search PubMed/NCBI for recent cardiovascular research articles"
+    scope: "read-only PubMed API access"
+    max_results: 5
+    features:
+      - "Bilingual keyword extraction (Spanish → English MeSH)"
+      - "Date range filtering (configurable min/max year)"
+      - "MeSH term optimization"
+      - "Retry logic with exponential backoff"
+
+  - name: "keyword_extractor"
+    type: "Medical Terminology Translator"
+    purpose: "Extract Spanish medical concepts and convert to English MeSH terms for PubMed"
+    model: "Google Gemini Flash"
+    output: "keywords, mesh_terms, suggested_query"
+
+  - name: "diagnostic_criteria"
+    type: "Clinical Decision Support"
+    purpose: "Apply established cardiovascular diagnostic criteria"
+    scope: "ACC/AHA, ESC guidelines embedded in system prompts and RAG"
+
+autonomy:
+  allowed_actions:
+    - "Retrieve cardiology knowledge from RAG"
+    - "Search PubMed for cardiovascular literature"
+    - "Extract medical keywords from Spanish consultations"
+    - "Generate evidence-based counter-referral notes"
+    - "Cite scientific sources"
+    - "Set requires_additional_info flag when data is missing"
+
+  requires_approval_for:
+    - "None (operates autonomously within specialist consultation workflow)"
+
+  deference_policy:
+    condition: "Critical patient information missing (e.g., blood pressure, ECG findings, lab results)"
+    action: "Set requires_additional_info=true and populate additional_questions list"
+    strict_rule: "DO NOT fabricate clinical data; only reference explicitly provided patient information"
+
+communication:
+  agent_to_agent:
+    protocol: "LangGraph parallel execution via asyncio.gather"
+    input_format: "InterconsultationNote (Pydantic model)"
+    output_format: "CounterReferralNote (Pydantic model)"
+    callbacks:
+      - "on_tool_start: Emit ToolStartedEvent"
+      - "on_tool_complete: Emit ToolCompletedEvent"
+      - "on_source_found: Emit SourceFoundEvent"
+
+  coordination:
+    orchestrator: "GeneralPractitionerAgent via LangGraph workflow"
+    parallel_execution: "Runs in parallel with other specialist agents"
+    isolation: "Each specialist agent instance is stateless for parallel execution"
+
+monitoring:
+  logged_metrics:
+    - "RAG retrieval latency"
+    - "PubMed search latency"
+    - "Response generation time"
+    - "Number of sources retrieved (RAG + PubMed)"
+    - "Gemini API token usage"
+
+  event_emissions:
+    - "SpecialistStartedEvent (specialty: cardiology)"
+    - "ToolStartedEvent (tool: rag_retrieval, pubmed_search, response_generation)"
+    - "ToolCompletedEvent (tool completion)"
+    - "SourceFoundEvent (each scientific source found)"
+    - "SpecialistCompletedEvent (specialty: cardiology)"
+
+  logging:
+    framework: "Python logging"
+    context: "Consultation-specific logger via get_consultation_logger"
+    log_entries:
+      - "Keyword extraction results"
+      - "PubMed query construction"
+      - "Number of articles retrieved"
+      - "RAG context length"
+
+governance:
+  safety_filters:
+    - "Gemini API content safety filters"
+    - "Evidence-based medicine validation"
+    - "Critical rules in system prompts: DO NOT FABRICATE DATA"
+
+  data_handling:
+    pii_phi: "Patient context processed in-memory only"
+    data_flow: "Interconsultation → Specialist Agent → Counter-referral → GP Agent"
+    encryption_in_transit: "HTTPS/TLS for Gemini API and PubMed API"
+    data_retention: "No persistent storage by specialist agent (stateless)"
+
+  medical_standards:
+    guidelines: ["ACC/AHA", "ESC"]
+    evidence_levels:
+      - "High: Systematic reviews, meta-analyses, RCTs"
+      - "Medium: Cohort studies, case-control studies"
+      - "Low: Expert opinion, case reports"
+
+  prohibited_actions:
+    - "Fabricating blood pressure readings, lab results, or clinical findings"
+    - "Making assumptions about missing patient data"
+    - "Providing off-guideline advice without evidence"
+    - "Storing raw patient identifiers"
+
+versioning:
+  release_tag: "v1.0.0"
+  release_date: "2025-11-09"
+  model_version: "Google Gemini Pro (models/gemini-2.5-pro)"
+  temperature: 0.05
+  prompt_template: "app/agents/prompts/specialists.py::get_prompt_especialista"
+  config_file: "app/config/specialists.yaml::cardiology"
+  rag_knowledge_base: "data/knowledge_base/cardiology/"
+  dependencies:
+    google-generativeai: ">=0.8.3"
+    chromadb: ">=0.5.23"
+    biopython: ">=1.84"  # For PubMed/Entrez
+    langchain: ">=0.3.14"
+
+expert_topics:
+  - "Heart failure"
+  - "Ischemic heart disease"
+  - "Arrhythmias"
+  - "Valvular heart disease"
+  - "Arterial hypertension"
+  - "Cardiomyopathies"
+
+known_limitations:
+  scope_boundaries:
+    - "Consultation/advisory role only - not diagnostic system"
+    - "Requires complete cardiovascular patient context"
+    - "PubMed search limited to English medical literature"
+    - "RAG knowledge base limited to indexed documents in data/knowledge_base/cardiology/"
+
+  brittleness_sources:
+    - "PubMed API availability and rate limits"
+    - "Gemini API rate limits and availability"
+    - "Keyword extraction quality for complex Spanish medical terminology"
+    - "RAG retrieval quality depends on knowledge base completeness"
+    - "JSON parsing from LLM responses (fallback to structured error response)"
+
+  partial_automation:
+    - "Requires human cardiologist review of counter-referral notes"
+    - "Cannot perform physical examination or interpret imaging directly"
+
+evaluation:
+  benchmarks_kpis:
+    evidence_citation_rate: ">=95% (percentage of responses with cited sources)"
+    hallucination_rate: "<1% (fabricated clinical data)"
+    pubmed_retrieval_success: ">80% (successful PubMed article retrieval)"
+    rag_retrieval_relevance: "User feedback on RAG context quality"
+    response_time_p50: "<30s (median time to generate counter-referral)"
+    mesh_extraction_accuracy: "Manual review of MeSH term quality"
+
+  calibration_policy:
+    abstention: "Set requires_additional_info=true when critical cardiovascular data is missing"
+    confidence_levels: ["low", "medium", "high"]
+    uncertainty_handling: "Explicit information_limitations field in counter-referral"
+
+  red_team_scenarios:
+    - "Prompt injection attempts in patient context"
+    - "Requests to fabricate cardiovascular findings"
+    - "Requests for off-guideline treatment recommendations"
+
+  evaluation_datasets:
+    - "Simulated cardiology interconsultations"
+    - "Real cardiology consultation logs (anonymized)"
+
+  last_evaluation:
+    date: "2025-11-09"
+    results: "Initial deployment - evaluation in progress"
+
+risks:
+  - name: "Fabricated cardiovascular findings"
+    severity: "Critical"
+    mitigation: "Strict system prompt rules; requires_additional_info mechanism; human review"
+
+  - name: "Incomplete PubMed search"
+    severity: "Medium"
+    mitigation: "Retry logic; fallback to RAG-only if PubMed fails; log warnings"
+
+  - name: "RAG retrieval irrelevance"
+    severity: "Medium"
+    mitigation: "Semantic search with top_k=5; regular knowledge base updates; source citation for transparency"
+
+  - name: "LLM hallucination in medical context"
+    severity: "High"
+    mitigation: "Evidence-based prompts; RAG grounding; PubMed verification; evidence_level field; human review"
+
+  - name: "Data privacy leakage"
+    severity: "High"
+    mitigation: "Stateless agent design; no persistent storage; HTTPS/TLS encryption; Gemini API privacy policies"
+
+ethical_considerations:
+  - "Specialist consultation is advisory only, not diagnostic or prescriptive"
+  - "Evidence-based approach with transparent source citations"
+  - "Explicit acknowledgment of information limitations"
+  - "Requires human cardiologist oversight for clinical application"
+  - "Patient data privacy protected through stateless design"
+  - "No fabrication of clinical data - strict adherence to provided information"
+
+# Credit to Agent Card standard creators
+agentcard_standard:
+  citation: "Urteaga-Reyesvera, J. C., & Lopez Murphy, J. J. (2025). Agent Cards: A Documentation Standard for Operational AI Agents. In MICAI 2025 Workshops (Lecture Notes in Artificial Intelligence). Springer Nature Switzerland AG."
+  repository: "https://github.com/CarlosUrteaga/agentcard"
+  license: "MIT"

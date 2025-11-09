@@ -26,6 +26,7 @@ from app.models.consultation import (
     InterrogationQuestion,
 )
 from app.models.notes import FormatoContextoPaciente
+from app.core.agentcard_loader import get_agent_card, get_agent_llm_config
 
 
 class GeneralPractitionerAgent:
@@ -43,6 +44,15 @@ class GeneralPractitionerAgent:
     def __init__(self):
         """Initialize general practitioner agent"""
         self.gemini_client = gemini_medico_general
+
+        # Load Agent Card
+        self.agent_card = get_agent_card("general_practitioner")
+        self.llm_config = get_agent_llm_config("general_practitioner")
+
+        if self.agent_card:
+            print("  ✓ Agent Card loaded for General Practitioner")
+        if self.llm_config:
+            print(f"    LLM: {self.llm_config.get('model_name', 'Unknown')} @ T={self.llm_config.get('temperature', 'Unknown')}")
 
     async def evaluate_consultation(
         self, consultation: str, patient_context: PatientContext

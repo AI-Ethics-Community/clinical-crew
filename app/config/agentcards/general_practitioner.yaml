@@ -1,0 +1,270 @@
+agentcard: "1.0"
+
+meta:
+  name: "General Practitioner Agent"
+  version: "1.0.0"
+  owner: "AI Ethics Community - Clinical Crew"
+  last_updated: "2025-11-09"
+  repository: "https://github.com/AI-Ethics-Community/clinical-crew"
+  license: "BSD-2-Clause"
+
+purpose:
+  objective: "Coordinate multi-agent medical consultation workflow, evaluate patient consultations, route to specialists, and integrate specialist responses into comprehensive clinical reports"
+  users: ["Medical Professionals", "Healthcare AI Systems", "Medical Students"]
+  domain: "General Medicine / Medical Coordination"
+
+agent_version: "1.0"
+agent_name: "GeneralPractitionerAgent"
+agent_role:
+  - "Medical Coordinator"
+  - "Initial Evaluator"
+  - "Interconsultation Orchestrator"
+  - "Response Integrator"
+
+interface:
+  inputs:
+    - "Medical consultation text (Spanish/English)"
+    - "Patient context (PatientContext model)"
+    - "User responses to interrogation questions"
+    - "Specialist counter-referral notes"
+  outputs:
+    - "General evaluation with routing decision"
+    - "Interconsultation notes for specialists"
+    - "Integrated clinical response"
+    - "Complete clinical record"
+    - "Interrogation questions (when needed)"
+
+memory:
+  short_term: "Current consultation context window, patient information for active case"
+  long_term:
+    type: "MongoDB persistent storage"
+    collection: "medical_consultations"
+    retention: "Configurable (default: permanent for clinical records)"
+    fields:
+      - "consultation_history"
+      - "interconsultation_notes"
+      - "counter_referrals"
+      - "clinical_records"
+      - "execution_traces"
+
+tools_functions:
+  - name: "gemini_medico_general"
+    type: "LLM (Google Gemini Pro)"
+    purpose: "Generate clinical evaluations, interconsultation notes, and integrated responses"
+    scope: "Medical reasoning, clinical decision-making"
+    input: "Structured prompts with patient context"
+    output: "JSON-formatted medical evaluations and recommendations"
+
+  - name: "evaluate_consultation"
+    type: "Decision Engine"
+    purpose: "Determine if GP can answer directly or needs specialist consultation"
+    eligibility: "All patient consultations"
+    output: "GeneralEvaluation with can_answer_directly flag and required_specialists list"
+
+  - name: "generate_interrogation_questions"
+    type: "Information Gathering"
+    purpose: "Generate targeted questions to complete missing patient information"
+    eligibility: "When patient context is incomplete for clinical decision-making"
+    output: "List of InterrogationQuestion objects with question_type (open/multiple_choice)"
+
+  - name: "evaluate_responses"
+    type: "Response Validator"
+    purpose: "Assess if user-provided responses are sufficient to proceed with evaluation"
+    output: "Evaluation with is_sufficient, missing_critical_info, and can_proceed flags"
+
+  - name: "generate_interconsulta"
+    type: "Specialist Communication"
+    purpose: "Create structured interconsultation notes for each specialist"
+    eligibility: "When specialist consultation is required"
+    output: "InterconsultationNote with specific_question and relevant_context"
+
+  - name: "integrate_responses"
+    type: "Clinical Synthesis"
+    purpose: "Consolidate specialist counter-referrals into unified clinical response"
+    input: "Multiple CounterReferralNote objects from specialists"
+    output: "Integrated clinical response with management_plan and followup recommendations"
+
+  - name: "generate_direct_response"
+    type: "Direct Clinical Response"
+    purpose: "Generate comprehensive response when specialists are not needed"
+    output: "Clinical response with final_response, general_summary, management_plan"
+
+communication:
+  human_interface:
+    - type: "REST API"
+      endpoint: "/api/v1/consultation"
+      format: "JSON"
+    - type: "WebSocket (SSE)"
+      endpoint: "/api/v1/consultation/{id}/stream"
+      purpose: "Real-time event streaming"
+
+  agent_to_agent:
+    protocol: "LangGraph State Machine"
+    message_schema: "MedicalConsultationState (TypedDict)"
+    orchestration: "LangGraph StateGraph with conditional edges"
+    parallelization: "Specialist agents execute in parallel via asyncio.gather"
+
+  handoff_policy:
+    - condition: "can_answer_directly == False"
+      action: "Generate interconsultations and route to specialist agents"
+    - condition: "requires_additional_info == True"
+      action: "Pause workflow, request user information via interrogation"
+    - condition: "All specialists completed"
+      action: "Integrate responses and generate final clinical record"
+
+monitoring:
+  logged_metrics:
+    - "Evaluation latency"
+    - "Specialist routing decisions"
+    - "Number of interconsultations per case"
+    - "Integration completion time"
+    - "Gemini API token usage"
+
+  trace_system:
+    enabled: true
+    storage: "MongoDB execution_trace field"
+    trace_fields:
+      - "node_name"
+      - "timestamp"
+      - "metadata"
+
+  observability:
+    event_system: "EventEmitter (app/core/event_emitter.py)"
+    event_types:
+      - "GPInterrogatingEvent"
+      - "GPQuestionEvent"
+      - "GPEvaluatingEvent"
+      - "InterconsultationCreatedEvent"
+      - "IntegratingEvent"
+      - "CompletedEvent"
+
+  logging:
+    framework: "Python logging with consultation-specific loggers"
+    log_file: "logs/consultation_{consulta_id}.log"
+    levels: ["DEBUG", "INFO", "WARNING", "ERROR"]
+
+governance:
+  safety_filters:
+    - "Gemini API built-in content filters"
+    - "Medical reasoning validation (evidence-based only)"
+    - "No direct treatment recommendations (consultation/guidance only)"
+
+  data_handling:
+    pii_phi: "Full patient context stored in MongoDB"
+    encryption_at_rest: "MongoDB encryption (if configured)"
+    encryption_in_transit: "HTTPS/TLS for API"
+    access_control: "API-level authentication (if configured)"
+
+  compliance:
+    medical_standards: "Evidence-based medicine guidelines"
+    disclaimer: "AI-assisted consultation system, not a replacement for professional medical judgment"
+
+  audit:
+    checkpoint: "All workflow transitions logged to execution_trace"
+    approval_required: false  # Autonomous operation within medical consultation context
+    review_recommended: "Clinical record review by human medical professional"
+
+versioning:
+  release_tag: "v1.0.0"
+  release_date: "2025-11-09"
+  model_version: "Google Gemini Pro (models/gemini-2.5-pro)"
+  temperature: 0.1
+  prompt_templates:
+    - "app/agents/prompts/general_practitioner.py"
+    - "app/agents/prompts/interrogation.py"
+  dependencies:
+    langchain: ">=0.3.14"
+    langgraph: ">=0.2.59"
+    google-generativeai: ">=0.8.3"
+    pydantic: ">=2.0"
+    motor: ">=3.6.0"
+    beanie: ">=1.27.0"
+
+autonomy:
+  allowed_actions:
+    - "Evaluate patient consultations"
+    - "Generate interrogation questions"
+    - "Route consultations to specialist agents"
+    - "Create interconsultation notes"
+    - "Integrate specialist responses"
+    - "Generate clinical records"
+    - "Emit workflow events"
+
+  requires_approval_for:
+    - "None (fully autonomous within medical consultation workflow)"
+
+  human_in_the_loop:
+    - stage: "Interrogation phase"
+      action: "Wait for user to provide responses to questions"
+    - stage: "Final clinical record"
+      action: "Recommend human review before clinical application"
+
+known_limitations:
+  scope_boundaries:
+    - "Spanish language primary (bilingual PubMed search uses English MeSH terms)"
+    - "Consultation/guidance only - not diagnostic or treatment system"
+    - "Requires complete patient context for optimal routing"
+    - "LLM non-determinism may affect routing decisions"
+
+  partial_automation:
+    - "Interrogation phase requires user interaction"
+    - "Clinical record should be reviewed by human medical professional"
+
+  brittleness_sources:
+    - "Gemini API availability and rate limits"
+    - "JSON parsing from LLM responses (fallback mechanisms in place)"
+    - "Specialist configuration must match specialists.yaml"
+
+evaluation:
+  benchmarks_kpis:
+    routing_accuracy: "Percentage of consultations correctly routed (direct vs specialist)"
+    interrogation_completeness: "Percentage of cases with sufficient information after interrogation"
+    integration_coherence: "Quality of integrated responses from multiple specialists"
+    response_time_p50: "Median time to complete evaluation phase"
+    response_time_p95: "95th percentile time to complete full workflow"
+
+  calibration_policy:
+    abstention: "Request additional information when patient context is incomplete"
+    uncertainty_handling: "Explicit requires_additional_info flag in responses"
+
+  evaluation_datasets:
+    - "Internal clinical case simulations"
+    - "Real consultation logs (anonymized)"
+
+  last_evaluation:
+    date: "2025-11-09"
+    results: "Initial deployment - evaluation in progress"
+
+risks:
+  - name: "Incomplete patient information"
+    severity: "Medium"
+    mitigation: "Interrogation phase with targeted questions; requires_additional_info flags"
+
+  - name: "Incorrect specialist routing"
+    severity: "Medium"
+    mitigation: "Evidence-based evaluation prompts; GP can consult multiple specialists if needed"
+
+  - name: "LLM hallucination in medical context"
+    severity: "High"
+    mitigation: "Evidence-based prompts; specialist agents use RAG + PubMed; critical rules in system prompts"
+
+  - name: "Data privacy concerns"
+    severity: "High"
+    mitigation: "Secure MongoDB storage; HTTPS/TLS; recommend deployment with encryption; audit logs"
+
+  - name: "Gemini API dependency"
+    severity: "Medium"
+    mitigation: "Error handling with fallback responses; configurable retry logic"
+
+ethical_considerations:
+  - "System provides consultation guidance, not medical diagnosis or treatment"
+  - "Requires human medical professional oversight for clinical application"
+  - "Patient privacy and data protection are critical"
+  - "Evidence-based medicine approach with source citations"
+  - "Transparent about AI involvement in consultation process"
+
+# Credit to Agent Card standard creators
+agentcard_standard:
+  citation: "Urteaga-Reyesvera, J. C., & Lopez Murphy, J. J. (2025). Agent Cards: A Documentation Standard for Operational AI Agents. In MICAI 2025 Workshops (Lecture Notes in Artificial Intelligence). Springer Nature Switzerland AG."
+  repository: "https://github.com/CarlosUrteaga/agentcard"
+  license: "MIT"

@@ -14,6 +14,7 @@ from app.models.consultation import CounterReferralNote, PatientContext
 from app.models.sources import ScientificSource, SourceType
 from app.models.notes import FormatoContextoPaciente
 from app.config.settings import settings
+from app.core.agentcard_loader import get_agent_card, get_agent_llm_config
 
 
 class SpecialistAgent:
@@ -42,6 +43,15 @@ class SpecialistAgent:
         self.on_tool_start = on_tool_start
         self.on_tool_complete = on_tool_complete
         self.on_source_found = on_source_found
+
+        # Load Agent Card
+        self.agent_card = get_agent_card(specialty)
+        self.llm_config = get_agent_llm_config(specialty)
+
+        if self.agent_card:
+            print(f"  ✓ Agent Card loaded for {specialty}")
+        if self.llm_config:
+            print(f"    LLM: {self.llm_config.get('model_name', 'Unknown')} @ T={self.llm_config.get('temperature', 'Unknown')}")
 
     def _load_config(self) -> Dict[str, Any]:
         """

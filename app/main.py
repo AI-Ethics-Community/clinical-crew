@@ -13,6 +13,7 @@ from app.models.database import init_db
 from app.api import dependencies
 from app.api.v1 import api_router
 from app.utils.logging import setup_logging
+from app.core.agentcard_loader import initialize_agentcards
 
 # Initialize logging
 setup_logging(log_level="INFO" if not settings.debug else "DEBUG")
@@ -47,7 +48,16 @@ async def lifespan(app: FastAPI):
     os.makedirs(settings.chroma_persist_directory, exist_ok=True)
     print(f"✓ ChromaDB directory ready: {settings.chroma_persist_directory}")
 
-    print("✅ Application started successfully!")
+    # Initialize Agent Cards
+    print("\n📋 Loading Agent Cards...")
+    try:
+        initialize_agentcards()
+        print("✓ Agent Cards loaded and validated")
+    except Exception as e:
+        print(f"⚠ Warning: Could not load Agent Cards: {str(e)}")
+        print("  System will continue without Agent Card documentation")
+
+    print("\n✅ Application started successfully!")
 
     yield
 
