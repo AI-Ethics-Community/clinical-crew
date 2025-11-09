@@ -24,9 +24,9 @@ RUN chmod +x scripts/*.sh scripts/*.py
 COPY ./app ./app
 COPY ./data ./data
 
-# Copiar backup de vectorstore si existe
-COPY vectorstore-backup.tar.g[z] ./ 2>/dev/null || true
-COPY vectorstore-backup.tar.gz.sha25[6] ./ 2>/dev/null || true
+# Copiar backup de vectorstore si existe (los corchetes hacen que sea opcional)
+COPY vectorstore-backup.tar.g[z] ./
+COPY vectorstore-backup.tar.gz.sha25[6] ./
 
 # Crear directorios necesarios
 RUN mkdir -p /app/logs && \
