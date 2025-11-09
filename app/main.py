@@ -43,6 +43,10 @@ async def lifespan(app: FastAPI):
         serverSelectionTimeoutMS=30000,  # 30 second timeout
         connectTimeoutMS=30000,
         socketTimeoutMS=30000,
+        # Additional TLS options to fix Docker SSL handshake issues
+        tls=True,
+        tlsAllowInvalidHostnames=True,
+        tlsAllowInvalidCertificates=False,
     )
 
     # Initialize Beanie
