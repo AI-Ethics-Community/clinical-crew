@@ -42,17 +42,19 @@ class NotasService:
         # Formatear contexto del paciente
         contexto_str = FormatoContextoPaciente.formatear(patient_context.model_dump())
 
-        # Crear plantilla
+        # Create template
         plantilla = PlantillaNotaInterconsulta(
             specialty=specialty,
-            motivo=f"Interconsulta para evaluación especializada en {specialty}",
-            antecedentes_relevantes=relevant_context.get("antecedentes", contexto_str),
+            motivo=f"Interconsultation for specialized evaluation in {specialty}",
+            antecedentes_relevantes=relevant_context.get("background", relevant_context.get("antecedentes", contexto_str)),
             contexto_clinico=original_consultation,
             specific_question=specific_question,
             informacion_relevante=contexto_str,
             expectativa=relevant_context.get(
-                "expectativa",
-                f"Se solicita evaluación desde la perspectiva de {specialty} y recomendaciones basadas en evidencia."
+                "expectation",
+                relevant_context.get("expectativa",
+                    f"Evaluation from {specialty} perspective and evidence-based recommendations requested."
+                )
             )
         )
 
@@ -195,16 +197,16 @@ class NotasService:
         especialistas_str = ", ".join(specialists)
 
         resumen = f"""
-RESUMEN EJECUTIVO
+EXECUTIVE SUMMARY
 
-Consulta: {consultation}
+Consultation: {consultation}
 
-Especialistas consultados: {especialistas_str}
+Specialists consulted: {especialistas_str}
 
-Respuesta:
+Response:
 {final_response}
 
-Total de specialists involucrados: {len(counter_referrals)}
+Total specialists involved: {len(counter_referrals)}
 """.strip()
 
         return resumen

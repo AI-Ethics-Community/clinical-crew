@@ -17,32 +17,32 @@ class PlantillaNotaInterconsulta(BaseModel):
     expectativa: str
 
     def generar_nota(self) -> str:
-        """Genera la nota de interconsultation formateada"""
+        """Generates formatted interconsultation note"""
         return f"""
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                    NOTA DE INTERCONSULTA A {self.specialty.upper()}                     ║
+║                    INTERCONSULTATION NOTE TO {self.specialty.upper()}                     ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
-MOTIVO DE INTERCONSULTA:
+REASON FOR INTERCONSULTATION:
 {self.motivo}
 
-ANTECEDENTES RELEVANTES:
+RELEVANT MEDICAL HISTORY:
 {self.antecedentes_relevantes}
 
-CONTEXTO CLÍNICO:
+CLINICAL CONTEXT:
 {self.contexto_clinico}
 
-PREGUNTA ESPECÍFICA:
+SPECIFIC QUESTION:
 {self.specific_question}
 
-INFORMACIÓN RELEVANTE:
+RELEVANT INFORMATION:
 {self.informacion_relevante}
 
-EXPECTATIVA:
+EXPECTATION:
 {self.expectativa}
 
 ────────────────────────────────────────────────────────────────────────────────
-Fecha y hora: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
+Date and time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
 ────────────────────────────────────────────────────────────────────────────────
 """.strip()
 
@@ -78,7 +78,7 @@ ADDITIONAL INFORMATION REQUIRED:
 
         nota = f"""
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║              NOTA DE CONTRARREFERENCIA - {self.specialty.upper()}                    ║
+║              COUNTER-REFERRAL NOTE - {self.specialty.upper()}                    ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
 EVALUATION:
@@ -100,7 +100,7 @@ EVIDENCE LEVEL:
 {self.evidence_level}
 {additional_info_str}
 ────────────────────────────────────────────────────────────────────────────────
-Fecha y hora: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
+Date and time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
 Specialist: {self.specialty}
 ────────────────────────────────────────────────────────────────────────────────
 """.strip()
@@ -124,73 +124,73 @@ class PlantillaExpedienteClinico(BaseModel):
         # Header
         clinical_record = f"""
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                           EXPEDIENTE CLÍNICO                                 ║
-║                    Sistema de Interconsulta Médica IA                        ║
+║                           CLINICAL RECORD                                    ║
+║                    AI Medical Interconsultation System                       ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
-FECHA Y HORA: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
+DATE AND TIME: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
 
 {'═' * 80}
-CONSULTA ORIGINAL
+ORIGINAL CONSULTATION
 {'═' * 80}
 
 {self.original_consultation}
 
-CONTEXTO DEL PACIENTE:
+PATIENT CONTEXT:
 {self.patient_context}
 
 {'═' * 80}
-NOTA DEL MÉDICO GENERAL - EVALUACIÓN INICIAL
+GENERAL PRACTITIONER NOTE - INITIAL EVALUATION
 {'═' * 80}
 
 {self.nota_medico_general}
 
 """
 
-        # Interconsultas y counter_referrals
+        # Interconsultations and counter-referrals
         if self.interconsultations:
             clinical_record += f"\n{'═' * 80}\n"
-            clinical_record += "INTERCONSULTAS Y RESPUESTAS DE ESPECIALISTAS\n"
+            clinical_record += "INTERCONSULTATIONS AND SPECIALIST RESPONSES\n"
             clinical_record += f"{'═' * 80}\n\n"
 
             for i, (nota_inter, nota_contra) in enumerate(self.interconsultations, 1):
                 clinical_record += f"\n{'─' * 80}\n"
-                clinical_record += f"INTERCONSULTA #{i}\n"
+                clinical_record += f"INTERCONSULTATION #{i}\n"
                 clinical_record += f"{'─' * 80}\n\n"
                 clinical_record += nota_inter
                 clinical_record += f"\n\n{'─' * 80}\n"
-                clinical_record += f"RESPUESTA ESPECIALISTA #{i}\n"
+                clinical_record += f"SPECIALIST RESPONSE #{i}\n"
                 clinical_record += f"{'─' * 80}\n\n"
                 clinical_record += nota_contra
                 clinical_record += "\n\n"
 
-        # Respuesta final
+        # Final response
         clinical_record += f"\n{'═' * 80}\n"
-        clinical_record += "INTEGRACIÓN Y RESPUESTA FINAL\n"
+        clinical_record += "INTEGRATION AND FINAL RESPONSE\n"
         clinical_record += f"{'═' * 80}\n\n"
         clinical_record += self.final_response
         clinical_record += "\n"
 
-        # Plan de manejo
+        # Management plan
         if self.management_plan:
             plan_str = "\n".join([f"{i+1}. {item}" for i, item in enumerate(self.management_plan)])
             clinical_record += f"\n{'─' * 80}\n"
-            clinical_record += "PLAN DE MANEJO\n"
+            clinical_record += "MANAGEMENT PLAN\n"
             clinical_record += f"{'─' * 80}\n\n"
             clinical_record += plan_str
             clinical_record += "\n"
 
-        # Seguimiento
+        # Follow-up
         if self.seguimiento:
             clinical_record += f"\n{'─' * 80}\n"
-            clinical_record += "SEGUIMIENTO RECOMENDADO\n"
+            clinical_record += "RECOMMENDED FOLLOW-UP\n"
             clinical_record += f"{'─' * 80}\n\n"
             clinical_record += self.seguimiento
             clinical_record += "\n"
 
         # Footer
         clinical_record += f"\n{'═' * 80}\n"
-        clinical_record += "FIN DEL EXPEDIENTE\n"
+        clinical_record += "END OF RECORD\n"
         clinical_record += f"{'═' * 80}\n"
 
         return clinical_record
