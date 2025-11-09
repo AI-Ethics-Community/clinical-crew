@@ -589,6 +589,14 @@ async def integrate_responses(
     for contra in counter_referrals:
         all_sources.extend(contra.sources)
 
+    # Calculate data source statistics
+    from app.models.sources import SourceType
+
+    rag_count = sum(1 for s in all_sources if s.source_type == SourceType.RAG)
+    pubmed_count = sum(1 for s in all_sources if s.source_type == SourceType.PUBMED)
+    rag_status = "success" if rag_count > 0 else "no_results"
+    pubmed_status = "success" if pubmed_count > 0 else "no_results"
+
     expediente_text = notas_service.generar_expediente_completo(
         original_consultation=state["original_consultation"],
         patient_context=contexto,
@@ -615,6 +623,13 @@ async def integrate_responses(
             data={
                 "final_response": response_data.get("final_response", ""),
                 "sources_count": len(all_sources),
+                "data_sources": {
+                    "rag_count": rag_count,
+                    "pubmed_count": pubmed_count,
+                    "total_count": len(all_sources),
+                    "rag_status": rag_status,
+                    "pubmed_status": pubmed_status,
+                },
             },
         )
     )
