@@ -11,6 +11,7 @@ from app.agents.prompts.general_practitioner import (
     PROMPT_EVALUACION_INICIAL,
     PROMPT_GENERAR_INTERCONSULTA,
     PROMPT_INTEGRAR_RESPUESTAS,
+    PROMPT_RESPUESTA_DIRECTA,
     PROMPT_SOLICITAR_INFORMACION,
 )
 from app.agents.prompts.interrogation import (
@@ -117,6 +118,38 @@ class GeneralPractitionerAgent:
         )
 
         return interconsultation
+
+    async def generate_direct_response(
+        self,
+        consultation: str,
+        patient_context: PatientContext,
+    ) -> Dict[str, Any]:
+        """
+        Generate direct response when GP can answer without specialists.
+
+        Args:
+            consultation: Original consultation
+            patient_context: Patient context
+
+        Returns:
+            Direct response with final answer and management plan
+        """
+        # Format patient context
+        contexto_str = FormatoContextoPaciente.formatear(patient_context.model_dump())
+
+        # Build prompt for direct response
+        prompt = PROMPT_RESPUESTA_DIRECTA.format(
+            consultation=consultation,
+            patient_context=contexto_str,
+        )
+
+        # Generate response
+        response_text = await self.gemini_client.generate_content_async(prompt)
+
+        # Parse response
+        response_data = self._parse_json_response(response_text)
+
+        return response_data
 
     async def integrate_responses(
         self,

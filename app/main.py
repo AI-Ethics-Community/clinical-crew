@@ -12,6 +12,10 @@ from app.config.settings import settings
 from app.models.database import init_db
 from app.api import dependencies
 from app.api.v1 import api_router
+from app.utils.logging import setup_logging
+
+# Initialize logging
+setup_logging(log_level="INFO" if not settings.debug else "DEBUG")
 
 
 @asynccontextmanager
