@@ -9,6 +9,7 @@ from pathlib import Path
 from app.services.gemini_client import gemini_especialista
 from app.services.pubmed_client import pubmed_client
 from app.rag.retriever import retriever
+from app.services.file_search_service import file_search_service
 from app.agents.prompts.specialists import get_prompt_especialista
 from app.models.consultation import CounterReferralNote, PatientContext
 from app.models.sources import ScientificSource, SourceType
@@ -126,6 +127,7 @@ class SpecialistAgent:
     async def _retrieve_from_rag(self, question: str, top_k: Optional[int] = None) -> str:
         """
         Retrieve relevant information from RAG knowledge base.
+        Uses Gemini File Search if configured, otherwise falls back to ChromaDB.
 
         Args:
             question: Question to search for
@@ -138,6 +140,11 @@ class SpecialistAgent:
             if top_k is None:
                 top_k = settings.rag_top_k
 
+            # Use File Search if configured
+            if settings.use_file_search:
+                return await self._retrieve_from_file_search(question, top_k)
+
+            # Fallback to ChromaDB
             result = retriever.retrieve_with_context(
                 query=question,
                 specialty=self.specialty,
@@ -214,6 +221,73 @@ class SpecialistAgent:
             return result['context']
         except Exception as e:
             print(f"Error retrieving from RAG: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return "No additional information found in knowledge base."
+
+    async def _retrieve_from_file_search(self, question: str, top_k: int) -> str:
+        """
+        Retrieve relevant information using Gemini File Search.
+
+        File Search works differently than ChromaDB - the LLM automatically
+        searches the store and returns grounded responses with citations.
+
+        Args:
+            question: Question to search for
+            top_k: Number of results (note: File Search determines actual count)
+
+        Returns:
+            Formatted context from File Search
+        """
+        try:
+            # Use File Search to generate context
+            # The LLM will automatically search and ground its response
+            search_query = f"Busca información relevante sobre: {question}"
+
+            response_text, citations = file_search_service.generate_with_file_search(
+                query=search_query,
+                specialty=self.specialty,
+                system_instruction="Eres un asistente médico que busca información relevante en guías clínicas. Proporciona un resumen conciso de la información encontrada."
+            )
+
+            # Process citations as sources
+            if citations:
+                for citation in citations:
+                    score = citation.score
+
+                    # Filter by threshold
+                    if score < settings.rag_min_relevance_score:
+                        print(f"⏭️  Skipped low-relevance citation: {citation.metadata.get('filename')} (score: {score:.3f})")
+                        continue
+
+                    source = ScientificSource(
+                        source_type=SourceType.RAG,
+                        title=citation.metadata.get('filename', 'Unknown'),
+                        content=citation.content,
+                        metadata=citation.metadata
+                    )
+                    self.sources.append(source)
+
+                    if self.on_source_found:
+                        await self.on_source_found(source)
+
+                # Log statistics
+                filtered_count = len([c for c in citations if c.score >= settings.rag_min_relevance_score])
+                if filtered_count > 0:
+                    scores = [c.score for c in citations if c.score >= settings.rag_min_relevance_score]
+                    print(f"✓ Retrieved {filtered_count} File Search citations (min_score={settings.rag_min_relevance_score})")
+                    print(f"  📊 Score range: {min(scores):.3f}-{max(scores):.3f}, avg: {sum(scores)/len(scores):.3f}")
+                else:
+                    print(f"⚠️  Retrieved 0 File Search citations after filtering (min_score={settings.rag_min_relevance_score})")
+
+            # Format the response as context
+            if response_text:
+                return f"Información de la base de conocimiento:\n\n{response_text}"
+            else:
+                return "No se encontró información relevante en la base de conocimiento."
+
+        except Exception as e:
+            print(f"Error retrieving from File Search: {str(e)}")
             import traceback
             traceback.print_exc()
             return "No additional information found in knowledge base."

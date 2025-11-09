@@ -16,22 +16,15 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copiar scripts de setup
+# Copiar scripts
 COPY ./scripts ./scripts
 RUN chmod +x scripts/*.sh scripts/*.py
 
 # Copiar configuración y archivos de aplicación
 COPY ./app ./app
-COPY ./data ./data
-
-# Copiar backup de vectorstore si existe (los corchetes hacen que sea opcional)
-COPY vectorstore-backup.tar.g[z] ./
-COPY vectorstore-backup.tar.gz.sha25[6] ./
 
 # Crear directorios necesarios
-RUN mkdir -p /app/logs && \
-    mkdir -p /app/data/vectorstore && \
-    chmod -R 755 /app/data
+RUN mkdir -p /app/logs
 
 # Exponer puerto (Render asigna dinámicamente, pero documentamos el default)
 EXPOSE 8000

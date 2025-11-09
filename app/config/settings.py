@@ -53,6 +53,12 @@ class Settings(BaseSettings):
         default=5, ge=1, le=20, description="Number of RAG chunks to retrieve"
     )
 
+    # Use Gemini File Search instead of ChromaDB for RAG
+    use_file_search: bool = Field(
+        default=True,
+        description="Use Gemini File Search API instead of local ChromaDB"
+    )
+
     # =============================================================================
     # PUBMED/NCBI
     # =============================================================================
