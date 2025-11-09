@@ -849,7 +849,9 @@ Ver [CONTRIBUTING.md](CONTRIBUTING.md) para guías de contribución.
 
 ## Licencia
 
-[MIT License](LICENSE)
+[Licencia BSD 2-Clause](LICENSE)
+
+Copyright (c) 2025, Diego Lerma
 
 ## Agradecimientos
 
