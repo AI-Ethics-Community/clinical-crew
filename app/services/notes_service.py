@@ -1,17 +1,18 @@
 """
 Servicio para generación de notes médicas.
 """
-from typing import List, Dict, Any
+
+from typing import List, Dict, Any, Optional
 from app.models.notes import (
     PlantillaNotaInterconsulta,
     PlantillaNotaContrarreferencia,
     PlantillaExpedienteClinico,
-    FormatoContextoPaciente
+    FormatoContextoPaciente,
 )
 from app.models.consultation import (
     InterconsultationNote,
     CounterReferralNote,
-    PatientContext
+    PatientContext,
 )
 
 
@@ -24,7 +25,7 @@ class NotasService:
         original_consultation: str,
         patient_context: PatientContext,
         specific_question: str,
-        relevant_context: Dict[str, Any]
+        relevant_context: Dict[str, Any],
     ) -> str:
         """
         Genera una nota de interconsultation formateada.
@@ -46,24 +47,25 @@ class NotasService:
         plantilla = PlantillaNotaInterconsulta(
             specialty=specialty,
             motivo=f"Interconsultation for specialized evaluation in {specialty}",
-            antecedentes_relevantes=relevant_context.get("background", relevant_context.get("antecedentes", contexto_str)),
+            antecedentes_relevantes=relevant_context.get(
+                "background", relevant_context.get("antecedentes", contexto_str)
+            ),
             contexto_clinico=original_consultation,
             specific_question=specific_question,
             informacion_relevante=contexto_str,
             expectativa=relevant_context.get(
                 "expectation",
-                relevant_context.get("expectativa",
-                    f"Evaluation from {specialty} perspective and evidence-based recommendations requested."
-                )
-            )
+                relevant_context.get(
+                    "expectativa",
+                    f"Evaluation from {specialty} perspective and evidence-based recommendations requested.",
+                ),
+            ),
         )
 
         return plantilla.generar_nota()
 
     @staticmethod
-    def generar_nota_contrarreferencia(
-        counter_referral: CounterReferralNote
-    ) -> str:
+    def generar_nota_contrarreferencia(counter_referral: CounterReferralNote) -> str:
         """
         Genera una nota de counter_referral formateada.
 
@@ -85,7 +87,7 @@ class NotasService:
                 counter_referral.additional_questions
                 if counter_referral.requires_additional_info
                 else None
-            )
+            ),
         )
 
         return plantilla.generar_nota()
@@ -98,8 +100,8 @@ class NotasService:
         interconsultations: List[InterconsultationNote],
         counter_referrals: List[CounterReferralNote],
         final_response: str,
-        management_plan: List[str] = None,
-        seguimiento: str = None
+        management_plan: Optional[List[str]] = None,
+        seguimiento: Optional[str] = None,
     ) -> str:
         """
         Genera el clinical_record clínico completo.
@@ -138,7 +140,7 @@ class NotasService:
                     original_consultation=original_consultation,
                     patient_context=patient_context,
                     specific_question=interconsultation.specific_question,
-                    relevant_context=interconsultation.relevant_context
+                    relevant_context=interconsultation.relevant_context,
                 )
 
                 nota_contra = NotasService.generar_nota_contrarreferencia(contra)
@@ -153,7 +155,7 @@ class NotasService:
             interconsultations=pares_notas,
             final_response=final_response,
             management_plan=management_plan,
-            seguimiento=seguimiento
+            seguimiento=seguimiento,
         )
 
         return plantilla.generar_expediente()
@@ -180,7 +182,7 @@ class NotasService:
     def generar_resumen_ejecutivo(
         consultation: str,
         counter_referrals: List[CounterReferralNote],
-        final_response: str
+        final_response: str,
     ) -> str:
         """
         Genera un resumen ejecutivo breve.

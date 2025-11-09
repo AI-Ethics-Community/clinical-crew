@@ -183,11 +183,11 @@ class RAGRetriever:
         if not chunks:
             return "No se encontró información relevante en la base de conocimiento."
 
-        context_parts = []
+        context_parts: List[str] = []
 
         for i, chunk in enumerate(chunks, 1):
-            source = chunk.metadata.get("filename", "Fuente desconocida")
-            chunk_idx = chunk.metadata.get("chunk_index", "")
+            source: str = str(chunk.metadata.get("filename", "Fuente desconocida"))
+            chunk_idx: Any = chunk.metadata.get("chunk_index", "")
 
             context_parts.append(
                 f"[Fuente {i}: {source} (fragmento {chunk_idx})]\n{chunk.content}"
@@ -195,39 +195,89 @@ class RAGRetriever:
 
         return "\n\n" + "\n\n---\n\n".join(context_parts)
 
-    def get_sources(self, chunks: List[DocumentChunk]) -> List[Dict[str, Any]]:
+    def get_sources(
+        self, chunks: List[DocumentChunk], group_by_document: bool = True
+    ) -> List[Dict[str, Any]]:
         """
-        Extrae las fuentes de los chunks con metadata completa.
+        Extract sources from chunks with complete metadata.
 
         Args:
-            chunks: Lista de chunks
+            chunks: List of chunks
+            group_by_document: Group multiple chunks from same document
 
         Returns:
-            Lista de fuentes con metadata completa (title, content, metadata, score)
+            List of sources with metadata (title, content, metadata, score)
         """
-        sources = []
-        seen_chunks = set()
+        if not group_by_document:
+            # Original behavior: one source per chunk
+            sources = []
+            seen_chunks = set()
+
+            for chunk in chunks:
+                chunk_id = f"{chunk.metadata.get('filename')}_{chunk.metadata.get('chunk_index')}"
+
+                if chunk_id not in seen_chunks:
+                    seen_chunks.add(chunk_id)
+                    sources.append(
+                        {
+                            "title": chunk.metadata.get("filename", "Unknown Document"),
+                            "content": (
+                                chunk.content[:300]
+                                if len(chunk.content) > 300
+                                else chunk.content
+                            ),
+                            "metadata": chunk.metadata,
+                            "score": chunk.score,
+                        }
+                    )
+
+            return sources
+
+        # Group chunks by document
+        from collections import defaultdict
+
+        docs_dict = defaultdict(list)
 
         for chunk in chunks:
-            # Use chunk hash to deduplicate (same filename might have multiple chunks)
-            chunk_id = (
-                f"{chunk.metadata.get('filename')}_{chunk.metadata.get('chunk_index')}"
+            filename = chunk.metadata.get("filename", "Unknown Document")
+            docs_dict[filename].append(chunk)
+
+        # Create one source per document with aggregated info
+        sources = []
+        for filename, doc_chunks in docs_dict.items():
+            # Sort chunks by relevance
+            doc_chunks.sort(key=lambda c: c.score, reverse=True)
+
+            # Use best chunk as representative
+            best_chunk = doc_chunks[0]
+
+            # Aggregate content from top chunks
+            combined_content = "\n\n".join(
+                [
+                    f"[Chunk {c.metadata.get('chunk_index')}]: {c.content[:200]}..."
+                    for c in doc_chunks[:3]  # Top 3 chunks max
+                ]
             )
 
-            if chunk_id not in seen_chunks:
-                seen_chunks.add(chunk_id)
-                sources.append(
-                    {
-                        "title": chunk.metadata.get("filename", "Unknown Document"),
-                        "content": (
-                            chunk.content[:300]
-                            if len(chunk.content) > 300
-                            else chunk.content
-                        ),  # Excerpt
-                        "metadata": chunk.metadata,
-                        "score": chunk.score,
-                    }
-                )
+            # Build metadata dict with explicit typing
+            source_metadata: Dict[str, Any] = {
+                **best_chunk.metadata,
+                "chunks_count": len(doc_chunks),
+                "chunk_indices": [c.metadata.get("chunk_index") for c in doc_chunks],
+                "avg_score": sum(c.score for c in doc_chunks) / len(doc_chunks),
+            }
+
+            source_entry: Dict[str, Any] = {
+                "title": filename,
+                "content": combined_content[:500],  # Limit total length
+                "metadata": source_metadata,
+                "score": best_chunk.score,  # Use best score
+            }
+
+            sources.append(source_entry)
+
+        # Sort by best score
+        sources.sort(key=lambda s: s["score"], reverse=True)
 
         return sources
 
@@ -248,7 +298,7 @@ class RAGRetriever:
         """
         chunks = self.retrieve(query, specialty, top_k)
 
-        result = {
+        result: Dict[str, Any] = {
             "context": self.format_context(chunks),
             "chunks_count": len(chunks),
         }

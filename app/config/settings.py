@@ -5,7 +5,7 @@ Carga variables de entorno desde .env
 
 from functools import lru_cache
 from typing import List
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,7 +19,9 @@ class Settings(BaseSettings):
     # =============================================================================
     # GOOGLE GEMINI
     # =============================================================================
-    gemini_api_key: str = Field(..., description="API Key de Google Gemini")
+    gemini_api_key: str | None = Field(
+        default=None, description="API Key de Google Gemini"
+    )
     gemini_pro_model: str = Field(default="gemini-2.5-pro-latest")
     gemini_flash_model: str = Field(default="gemini-2.5-flash-latest")
     gemini_temperature: float = Field(default=0.1, ge=0.0, le=2.0)
@@ -36,16 +38,25 @@ class Settings(BaseSettings):
     mongodb_min_connections: int = Field(default=1)
 
     # =============================================================================
-    # CHROMADB
+    # CHROMADB / RAG
     # =============================================================================
     chroma_persist_directory: str = Field(default="./data/vectorstore")
     chroma_collection_prefix: str = Field(default="medical_kb")
     chroma_embedding_model: str = Field(default="models/text-embedding-004")
+    rag_min_relevance_score: float = Field(
+        default=0.3,
+        ge=0.0,
+        le=1.0,
+        description="Minimum relevance score for RAG results (0-1)",
+    )
+    rag_top_k: int = Field(
+        default=5, ge=1, le=20, description="Number of RAG chunks to retrieve"
+    )
 
     # =============================================================================
     # PUBMED/NCBI
     # =============================================================================
-    pubmed_email: str = Field(..., description="Email para PubMed API")
+    pubmed_email: str | None = Field(default=None, description="Email for PubMed API")
     pubmed_api_key: str = Field(default="")
     pubmed_max_results: int = Field(default=10)
     pubmed_tool_name: str = Field(default="ClinicalCrew")
@@ -55,6 +66,12 @@ class Settings(BaseSettings):
     pubmed_use_mesh_extraction: bool = Field(default=True)
     pubmed_min_year: int = Field(default=2015)
     pubmed_max_year: int = Field(default=2025)
+    pubmed_request_timeout: int = Field(
+        default=15, description="Timeout per request (seconds)"
+    )
+    pubmed_total_timeout: int = Field(
+        default=60, description="Total timeout including retries (seconds)"
+    )
 
     # =============================================================================
     # API
@@ -67,6 +84,15 @@ class Settings(BaseSettings):
     )
     debug: bool = Field(default=True)
     cors_origins_str: str = Field(default="http://localhost:3000", alias="CORS_ORIGINS")
+
+    @model_validator(mode="after")
+    def validate_required_fields(self) -> "Settings":
+        """Validate that required fields are set from environment variables"""
+        if not self.gemini_api_key:
+            raise ValueError("GEMINI_API_KEY environment variable is required")
+        if not self.pubmed_email:
+            raise ValueError("PUBMED_EMAIL environment variable is required")
+        return self
 
     @property
     def cors_origins(self) -> List[str]:

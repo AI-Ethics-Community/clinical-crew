@@ -148,6 +148,7 @@ class CompleteConsultation(BaseModel):
     status: str
     timestamp: datetime
     interrogation_questions: List[InterrogationQuestion] = Field(default_factory=list)
+    user_responses: Optional[Dict[str, Any]] = Field(None, description="User responses to interrogation questions")
     interrogation_completed: bool = False
     general_evaluation: Optional[GeneralEvaluation]
     interconsultations: List[InterconsultationNote]

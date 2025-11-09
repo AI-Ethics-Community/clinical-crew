@@ -123,18 +123,21 @@ class SpecialistAgent:
 
         return counter_referral
 
-    async def _retrieve_from_rag(self, question: str, top_k: int = 5) -> str:
+    async def _retrieve_from_rag(self, question: str, top_k: Optional[int] = None) -> str:
         """
         Retrieve relevant information from RAG knowledge base.
 
         Args:
             question: Question to search for
-            top_k: Number of results to retrieve
+            top_k: Number of results to retrieve (uses settings default if None)
 
         Returns:
             Formatted context from RAG
         """
         try:
+            if top_k is None:
+                top_k = settings.rag_top_k
+
             result = retriever.retrieve_with_context(
                 query=question,
                 specialty=self.specialty,
@@ -142,21 +145,77 @@ class SpecialistAgent:
                 include_sources=True
             )
 
+            # Filter sources by minimum relevance score
             if 'sources' in result:
+                filtered_sources = []
                 for source_dict in result['sources']:
+                    score = source_dict.get('score', 0.0)
+
+                    # Apply relevance threshold
+                    if score < settings.rag_min_relevance_score:
+                        print(f"⏭️  Skipped low-relevance source: {source_dict.get('title')} (score: {score:.3f})")
+                        continue
+
                     source = ScientificSource(
                         source_type=SourceType.RAG,
                         title=source_dict.get('title', 'Unknown'),
                         content=source_dict.get('content', ''),
                         metadata=source_dict.get('metadata', {})
                     )
+                    filtered_sources.append(source)
                     self.sources.append(source)
+
                     if self.on_source_found:
                         await self.on_source_found(source)
+
+                # Log score distribution for monitoring
+                if filtered_sources:
+                    scores = [s.metadata.get('score', 0.0) for s in filtered_sources]
+                    print(f"✓ Retrieved {len(filtered_sources)} RAG sources (filtered from {len(result.get('sources', []))} by min_score={settings.rag_min_relevance_score})")
+                    print(f"  📊 Score range: {min(scores):.3f}-{max(scores):.3f}, avg: {sum(scores)/len(scores):.3f}")
+                else:
+                    print(f"⚠️  Retrieved 0 RAG sources after filtering (min_score={settings.rag_min_relevance_score})")
+
+                # Adaptive retrieval: if very few sources, retry with lower threshold
+                if len(filtered_sources) < 2 and settings.rag_min_relevance_score > 0.25:
+                    print(f"⚠️  Only {len(filtered_sources)} sources found, retrying with lower threshold (0.25)...")
+
+                    # Retry with lower threshold
+                    retry_result = retriever.retrieve_with_context(
+                        query=question,
+                        specialty=self.specialty,
+                        top_k=top_k,
+                        include_sources=True
+                    )
+
+                    # Filter with lower threshold
+                    if 'sources' in retry_result:
+                        additional_sources = []
+                        for source_dict in retry_result['sources']:
+                            score = source_dict.get('score', 0.0)
+
+                            # Use lower threshold (0.25) but exclude already added sources
+                            if score >= 0.25 and score < settings.rag_min_relevance_score:
+                                source = ScientificSource(
+                                    source_type=SourceType.RAG,
+                                    title=source_dict.get('title', 'Unknown'),
+                                    content=source_dict.get('content', ''),
+                                    metadata=source_dict.get('metadata', {})
+                                )
+                                additional_sources.append(source)
+                                self.sources.append(source)
+
+                                if self.on_source_found:
+                                    await self.on_source_found(source)
+
+                        if additional_sources:
+                            print(f"  ✓ Added {len(additional_sources)} additional sources with scores 0.25-{settings.rag_min_relevance_score:.2f}")
 
             return result['context']
         except Exception as e:
             print(f"Error retrieving from RAG: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return "No additional information found in knowledge base."
 
     async def _search_pubmed(
@@ -248,8 +307,16 @@ class SpecialistAgent:
             return pubmed_client.format_articles_for_context(articles)
 
         except Exception as e:
-            print(f"✗ Error in PubMed search: {str(e)}")
-            return "No articles found in PubMed."
+            error_msg = str(e)
+            print(f"✗ Error in PubMed search: {error_msg}")
+
+            # Log the error for visibility
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"PubMed search failed for specialty {self.specialty}: {error_msg}")
+
+            # Return informative message
+            return f"PubMed search unavailable due to: {error_msg[:100]}"
 
     async def _generate_response(
         self,

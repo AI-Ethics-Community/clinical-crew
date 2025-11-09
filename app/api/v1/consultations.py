@@ -1,6 +1,7 @@
 """
 Consultation endpoints.
 """
+
 from fastapi import APIRouter, HTTPException, status
 from typing import Dict, Any, List
 from pydantic import BaseModel
@@ -9,21 +10,30 @@ from app.models.consultation import (
     ConsultationCreate,
     ConsultationResponse,
     AdditionalInformation,
-    CompleteConsultation
+    CompleteConsultation,
 )
 from app.models.sources import ScientificSource
 from app.models.database import MedicalConsultation
-from app.agents.graph import medical_consultation_workflow, medical_consultation_workflow_from_evaluation, MedicalConsultationState
+from app.agents.graph import (
+    medical_consultation_workflow,
+    medical_consultation_workflow_from_evaluation,
+    MedicalConsultationState,
+)
 
 router = APIRouter()
 
 
 class InterrogationResponse(BaseModel):
     """Response model for interrogation answers"""
+
     responses: Dict[str, Any]
 
 
-@router.post("/consultation", response_model=ConsultationResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/consultation",
+    response_model=ConsultationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_consultation(consultation_data: ConsultationCreate):
     """
     Create a new medical consultation.
@@ -32,7 +42,7 @@ async def create_consultation(consultation_data: ConsultationCreate):
         user_id=consultation_data.user_id,
         original_consultation=consultation_data.consultation,
         patient_context=consultation_data.context,
-        status="interrogating"
+        status="interrogating",
     )
 
     await consultation_db.insert()
@@ -50,37 +60,45 @@ async def create_consultation(consultation_data: ConsultationCreate):
         "clinical_record": None,
         "final_response": None,
         "status": "interrogating",
-        "error": None
+        "error": None,
     }
 
     try:
         final_state = await medical_consultation_workflow.ainvoke(initial_state)
 
-        if final_state.get('status') == 'interrogating':
+        if final_state.get("status") == "interrogating":
             return ConsultationResponse(
                 consultation_id=str(consultation_db.id),
                 status="interrogating",
                 message="GP needs additional patient information",
                 progress={
-                    "interrogation_questions": final_state.get('interrogation_questions', [])
-                }
+                    "interrogation_questions": final_state.get(
+                        "interrogation_questions", []
+                    )
+                },
             )
 
-        elif final_state.get('status') == 'completed':
+        elif final_state.get("status") == "completed":
             consultation_db = await MedicalConsultation.get(consultation_db.id)
+
+            if not consultation_db:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Consultation not found after completion",
+                )
 
             return ConsultationResponse(
                 consultation_id=str(consultation_db.id),
                 status="completed",
                 message="Consultation completed successfully",
-                clinical_record=consultation_db.clinical_record
+                clinical_record=consultation_db.clinical_record,
             )
 
         else:
             return ConsultationResponse(
                 consultation_id=str(consultation_db.id),
-                status=final_state.get('status', 'processing'),
-                message="Consultation in progress"
+                status=final_state.get("status", "processing"),
+                message="Consultation in progress",
             )
 
     except Exception as e:
@@ -90,7 +108,7 @@ async def create_consultation(consultation_data: ConsultationCreate):
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error processing consultation: {str(e)}"
+            detail=f"Error processing consultation: {str(e)}",
         )
 
 
@@ -104,7 +122,7 @@ async def get_consultation(consultation_id: str):
     if not consultation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Consultation not found: {consultation_id}"
+            detail=f"Consultation not found: {consultation_id}",
         )
 
     return CompleteConsultation(
@@ -115,18 +133,23 @@ async def get_consultation(consultation_id: str):
         status=consultation.status,
         timestamp=consultation.created_at,
         interrogation_questions=consultation.interrogation_questions,
+        user_responses=consultation.user_responses,
         interrogation_completed=consultation.interrogation_completed,
         general_evaluation=consultation.general_evaluation,
         interconsultations=consultation.interconsultations,
         counter_referrals=consultation.counter_referrals,
         clinical_record=consultation.clinical_record,
         created_at=consultation.created_at,
-        updated_at=consultation.updated_at
+        updated_at=consultation.updated_at,
     )
 
 
-@router.post("/consultation/{consultation_id}/respond", response_model=ConsultationResponse)
-async def respond_to_interrogation(consultation_id: str, response: InterrogationResponse):
+@router.post(
+    "/consultation/{consultation_id}/respond", response_model=ConsultationResponse
+)
+async def respond_to_interrogation(
+    consultation_id: str, response: InterrogationResponse
+):
     """
     Provide responses to GP interrogation questions.
     """
@@ -135,13 +158,13 @@ async def respond_to_interrogation(consultation_id: str, response: Interrogation
     if not consultation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Consultation not found: {consultation_id}"
+            detail=f"Consultation not found: {consultation_id}",
         )
 
     if consultation.status != "interrogating":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Consultation is not in interrogation phase. Current status: {consultation.status}"
+            detail=f"Consultation is not in interrogation phase. Current status: {consultation.status}",
         )
 
     consultation.user_responses = response.responses
@@ -162,27 +185,35 @@ async def respond_to_interrogation(consultation_id: str, response: Interrogation
         "clinical_record": None,
         "final_response": None,
         "status": "evaluating",
-        "error": None
+        "error": None,
     }
 
     try:
-        final_state = await medical_consultation_workflow_from_evaluation.ainvoke(resume_state)
+        final_state = await medical_consultation_workflow_from_evaluation.ainvoke(
+            resume_state
+        )
 
-        if final_state.get('status') == 'completed':
+        if final_state.get("status") == "completed":
             consultation = await MedicalConsultation.get(consultation.id)
+
+            if not consultation:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Consultation not found after completion",
+                )
 
             return ConsultationResponse(
                 consultation_id=str(consultation.id),
                 status="completed",
                 message="Consultation completed successfully",
-                clinical_record=consultation.clinical_record
+                clinical_record=consultation.clinical_record,
             )
 
         else:
             return ConsultationResponse(
                 consultation_id=str(consultation.id),
-                status=final_state.get('status', 'processing'),
-                message="Consultation in progress"
+                status=final_state.get("status", "processing"),
+                message="Consultation in progress",
             )
 
     except Exception as e:
@@ -192,11 +223,13 @@ async def respond_to_interrogation(consultation_id: str, response: Interrogation
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error processing consultation: {str(e)}"
+            detail=f"Error processing consultation: {str(e)}",
         )
 
 
-@router.get("/consultation/{consultation_id}/sources", response_model=List[ScientificSource])
+@router.get(
+    "/consultation/{consultation_id}/sources", response_model=List[ScientificSource]
+)
 async def get_consultation_sources(consultation_id: str):
     """
     Get all scientific sources used in consultation.
@@ -206,17 +239,19 @@ async def get_consultation_sources(consultation_id: str):
     if not consultation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Consultation not found: {consultation_id}"
+            detail=f"Consultation not found: {consultation_id}",
         )
 
     all_sources = []
 
     if consultation.counter_referrals:
         for counter_referral in consultation.counter_referrals:
-            if hasattr(counter_referral, 'sources'):
+            if hasattr(counter_referral, "sources"):
                 all_sources.extend(counter_referral.sources)
 
-    if consultation.clinical_record and hasattr(consultation.clinical_record, 'all_sources'):
+    if consultation.clinical_record and hasattr(
+        consultation.clinical_record, "all_sources"
+    ):
         all_sources = consultation.clinical_record.all_sources
 
     return all_sources
@@ -232,7 +267,7 @@ async def get_consultation_status(consultation_id: str) -> Dict[str, Any]:
     if not consultation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Consultation not found: {consultation_id}"
+            detail=f"Consultation not found: {consultation_id}",
         )
 
     return {
@@ -242,11 +277,15 @@ async def get_consultation_status(consultation_id: str) -> Dict[str, Any]:
         "updated_at": consultation.updated_at,
         "completed_at": consultation.completed_at,
         "progress": {
-            "interrogation_completed": consultation.interrogation_completed if hasattr(consultation, 'interrogation_completed') else False,
+            "interrogation_completed": (
+                consultation.interrogation_completed
+                if hasattr(consultation, "interrogation_completed")
+                else False
+            ),
             "evaluation_completed": consultation.general_evaluation is not None,
             "interconsultations_generated": len(consultation.interconsultations),
             "counter_referrals_received": len(consultation.counter_referrals),
-            "clinical_record_generated": consultation.clinical_record is not None
+            "clinical_record_generated": consultation.clinical_record is not None,
         },
-        "error": consultation.error_message
+        "error": consultation.error_message,
     }
