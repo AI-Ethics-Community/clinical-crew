@@ -1,0 +1,86 @@
+# Development and testing files (not needed in production container)
+test_*.py
+*_test.py
+tests/
+pytest.ini
+.pytest_cache/
+.coverage
+htmlcov/
+*.md
+
+# Documentation (keep in repo but exclude from Docker)
+docs/
+MONGODB_SSL_TEST_RESULTS.md
+README.md
+CONTRIBUTING.md
+CHANGELOG.md
+ARCHITECTURE.md
+DEPLOYMENT.md
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+azure-pipelines.yml
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Python cache and virtual environments
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# Environment files (use Render environment variables instead)
+.env
+.env.*
+.env.local
+.env.example
+.env.production.example
+
+# Logs (will be generated in container)
+logs/
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+.mypy_cache/
+.ruff_cache/
+
+# Large binary files
+*.zip
+*.tar.gz
+*.rar
+clinical-crew-code.zip
+
+# Local data (use mounted volumes or cloud storage)
+data/mongodb/
+data/vectorstore/chroma.sqlite3
+
+# Development scripts (already have production scripts/ in Docker)
+quickstart.sh
+example_usage.py
+
+# Package manager files
+poetry.lock
+Pipfile.lock
+package-lock.json
+yarn.lock

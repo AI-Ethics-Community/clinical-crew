@@ -43,7 +43,7 @@ venv.bak/
 [Ll]ib
 [Ll]ib64
 [Ll]ocal
-[Ss]cripts
+venv/[Ss]cripts  # Only ignore Scripts in venv directories
 pyvenv.cfg
 pip-selfcheck.json
 
