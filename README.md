@@ -16,25 +16,32 @@ This system recreates the interaction between healthcare professionals using spe
 
 ### AI System Workflow
 
-```
-User (Doctor)
-    ↓
-[General Practitioner Agent]
-    ↓
-Evaluation: Can I answer directly?
-    ├─ YES → Direct response
-    └─ NO → Generate Interconsultation Notes
-              ↓
-        [Specialist 1] [Specialist 2] [Specialist N]
-              ↓                ↓                ↓
-         (RAG + PubMed + Reasoning in parallel)
-              ↓                ↓                ↓
-        Counter-referral Note 1, 2, ..., N
-              ↓
-        [General Practitioner Integrates]
-              ↓
-        Complete Clinical Record
-```
+![Clinical Crew Workflow Diagram](public/images/diagrams/clinical-crew-diagram.png)
+
+The system implements a sophisticated multi-agent workflow using LangGraph:
+
+1. **Interrogation Phase**: GP gathers necessary patient information
+2. **Evaluation**: Determines if direct response is possible or specialists are needed
+3. **Parallel Specialist Execution**: Multiple specialists analyze the case simultaneously
+4. **Integration**: GP synthesizes all responses into a comprehensive clinical record
+
+#### LangGraph Architecture
+
+![LangGraph Native Diagram](public/images/diagrams/graph_native.png)
+
+**Node Structure**:
+- `__start__` → Entry point
+- `interrogate` → Patient information gathering
+- `evaluate` → Case complexity assessment
+- `direct_response` → Simple cases (GP answers directly)
+- `generate_interconsultations` → Create specialist consultation notes
+- `execute_specialists` → ⚡ **Parallel execution** of specialist agents
+- `integrate` → Synthesize all specialist responses
+- `__end__` → Workflow completion
+
+**Edge Types**:
+- Solid lines (→): Direct transitions
+- Dotted lines (⋯→): Conditional transitions based on evaluation
 
 ## Main Features
 
@@ -898,8 +905,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 
 ### Contact
 
-- Email: dc.lerma@ugto.mx
-- Documentation: [docs/](docs/)
+**Project Authors:**
+- Diego Lerma - [dc.lerma@ugto.mx](mailto:dc.lerma@ugto.mx)
+- Karla Doctor - [ka.doctormauricio@gmail.com](mailto:ka.doctormauricio@gmail.com)
+
+**Documentation:** [docs/](docs/)
 
 ## License
 
@@ -907,17 +917,23 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 
 ## Acknowledgments
 
-This project was developed by the AI Ethics Community.
+**Clinical Crew** was developed by:
+- **Diego Lerma** - Lead Developer
+- **Karla Doctor** - Co-Developer
 
-Technologies used:
+This project is part of the AI Ethics Community initiative.
+
+### Technologies Used
 
 - Google Gemini
 - LangChain and LangGraph
 - FastAPI
 - MongoDB
+- ChromaDB
 
 ---
 
 **Version:** 1.0.0
-**Last updated:** 2025-11-08
-**Maintainers:** AI Ethics Community
+**Last updated:** 2025-11-09
+**Authors:** Diego Lerma, Karla Doctor
+**Organization:** AI Ethics Community

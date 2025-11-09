@@ -16,25 +16,34 @@ Este sistema recrea la interacción entre profesionales de la salud mediante age
 
 ### Flujo del Sistema IA
 
-```
-Usuario (Médico)
-    ↓
-[Agente Médico General]
-    ↓
-Evaluación: ¿Puedo responder directamente?
-    ├─ SÍ → Respuesta directa
-    └─ NO → Generar Notas de Interconsulta
-              ↓
-        [Especialista 1] [Especialista 2] [Especialista N]
-              ↓                ↓                ↓
-         (RAG + PubMed + Razonamiento en paralelo)
-              ↓                ↓                ↓
-        Nota Contrarreferencia 1, 2, ..., N
-              ↓
-        [Médico General Integra]
-              ↓
-        Expediente Clínico Completo
-```
+![Diagrama de Flujo de Clinical Crew](public/images/diagrams/clinical-crew-diagram.png)
+
+El sistema implementa un flujo de trabajo multi-agente sofisticado usando LangGraph:
+
+1. **Fase de Interrogación**: El médico general recopila información necesaria del paciente
+2. **Evaluación**: Determina si es posible una respuesta directa o si se necesitan especialistas
+3. **Ejecución Paralela de Especialistas**: Múltiples especialistas analizan el caso simultáneamente
+4. **Integración**: El médico general sintetiza todas las respuestas en un expediente clínico completo
+
+#### Arquitectura LangGraph
+
+![Diagrama Nativo de LangGraph](public/images/diagrams/graph_native.png)
+
+**Estructura de Nodos**:
+
+- `__start__` → Punto de entrada
+- `interrogate` → Recopilación de información del paciente
+- `evaluate` → Evaluación de complejidad del caso
+- `direct_response` → Casos simples (el MG responde directamente)
+- `generate_interconsultations` → Crear notas de interconsulta para especialistas
+- `execute_specialists` → ⚡ **Ejecución paralela** de agentes especialistas
+- `integrate` → Sintetizar todas las respuestas de especialistas
+- `__end__` → Finalización del flujo
+
+**Tipos de Aristas**:
+
+- Líneas sólidas (→): Transiciones directas
+- Líneas punteadas (⋯→): Transiciones condicionales basadas en evaluación
 
 ## Características Principales
 
@@ -831,8 +840,12 @@ Ver [CONTRIBUTING.md](CONTRIBUTING.md) para guías de contribución.
 
 ### Contacto
 
-- Email: dc.lerma@ugto.mx
-- Documentación: [docs/](docs/)
+**Autores del Proyecto:**
+
+- Diego Lerma - [dc.lerma@ugto.mx](mailto:dc.lerma@ugto.mx)
+- Karla Doctor - [ka.doctormauricio@gmail.com](mailto:ka.doctormauricio@gmail.com)
+
+**Documentación:** [docs/](docs/)
 
 ## Licencia
 
@@ -840,17 +853,24 @@ Ver [CONTRIBUTING.md](CONTRIBUTING.md) para guías de contribución.
 
 ## Agradecimientos
 
-Este proyecto fue desarrollado por la AI Ethics Community.
+**Clinical Crew** fue desarrollado por:
 
-Tecnologías utilizadas:
+- **Diego Lerma** - Desarrollador Principal
+- **Karla Doctor** - Co-Desarrolladora
+
+Este proyecto es parte de la iniciativa AI Ethics Community.
+
+### Tecnologías Utilizadas
 
 - Google Gemini
 - LangChain y LangGraph
 - FastAPI
 - MongoDB
+- ChromaDB
 
 ---
 
 **Versión:** 1.0.0
-**Última actualización:** 2025-11-08
-**Mantenedores:** AI Ethics Community
+**Última actualización:** 2025-11-09
+**Autores:** Diego Lerma, Karla Doctor
+**Organización:** AI Ethics Community
