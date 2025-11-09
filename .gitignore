@@ -91,11 +91,19 @@ db.sqlite3-journal
 # MongoDB data
 data/mongodb/
 
-# Vector store data
-data/vectorstore/
+# Vector store data (keep structure but ignore content)
+data/vectorstore/*
+!data/vectorstore/.gitkeep
 *.faiss
 *.pkl
 *.index
+
+# Knowledge base PDF files
+data/knowledge_base/**/*.pdf
+
+# Render deployment
+.render/
+render.yaml.bak
 
 # Knowledge base (si contiene datos sensibles)
 # data/knowledge_base/

@@ -195,12 +195,15 @@ class DocumentIndexer:
             chunk_metadata = {
                 "specialty": specialty,
                 "filename": file_path.name,
-                "chunk_index": i,
-                "total_chunks": len(chunks),
+                "chunk_index": str(i),  # ChromaDB requires string values
+                "total_chunks": str(len(chunks)),  # ChromaDB requires string values
                 "document_hash": hash_doc,
             }
             if metadata:
-                chunk_metadata.update(metadata)
+                # Add optional metadata fields as strings
+                for key, value in metadata.items():
+                    if value is not None:
+                        chunk_metadata[key] = str(value)
             chunk_metadatas.append(chunk_metadata)
 
         # Indexar en ChromaDB
@@ -313,8 +316,18 @@ indexer = DocumentIndexer()
 if __name__ == "__main__":
     import asyncio
     import sys
+    from motor.motor_asyncio import AsyncIOMotorClient
+    from app.models.database import init_db
+    from app.config.settings import settings
 
     async def main():
+        # Initialize MongoDB connection
+        client = AsyncIOMotorClient(settings.mongodb_url)
+        database = client[settings.mongodb_db_name]
+
+        # Initialize Beanie ODM
+        await init_db(database)
+
         if len(sys.argv) > 1:
             if sys.argv[1] == "--all":
                 print("🚀 Indexando todos los documentos...")
@@ -327,5 +340,8 @@ if __name__ == "__main__":
                 print("Uso: python indexer.py [--all | --specialty NOMBRE]")
         else:
             print("Uso: python indexer.py [--all | --specialty NOMBRE]")
+
+        # Close connection
+        client.close()
 
     asyncio.run(main())

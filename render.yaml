@@ -1,0 +1,107 @@
+services:
+  # API Service
+  - type: web
+    name: clinical-crew-api
+    runtime: docker
+    plan: starter
+    region: oregon
+    branch: main
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      # Gemini API Configuration
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_PRO_MODEL
+        value: gemini-2.5-pro-latest
+      - key: GEMINI_FLASH_MODEL
+        value: gemini-2.5-flash-latest
+      - key: GEMINI_TEMPERATURE
+        value: "0.1"
+      - key: GEMINI_MAX_OUTPUT_TOKENS
+        value: "8192"
+
+      # Database Configuration (MongoDB Atlas recommended)
+      - key: MONGODB_URL
+        sync: false
+      - key: MONGODB_DB_NAME
+        value: hacknation_medical
+      - key: MONGODB_MAX_CONNECTIONS
+        value: "10"
+      - key: MONGODB_MIN_CONNECTIONS
+        value: "1"
+
+      # Vector Store Configuration
+      - key: CHROMA_PERSIST_DIRECTORY
+        value: /app/data/vectorstore
+      - key: CHROMA_COLLECTION_PREFIX
+        value: medical_kb
+      - key: CHROMA_EMBEDDING_MODEL
+        value: models/text-embedding-004
+
+      # PubMed Configuration
+      - key: PUBMED_EMAIL
+        sync: false
+      - key: PUBMED_API_KEY
+        sync: false
+      - key: PUBMED_MAX_RESULTS
+        value: "10"
+      - key: PUBMED_TOOL_NAME
+        value: ClinicalCrew
+
+      # API Configuration
+      - key: API_V1_PREFIX
+        value: /api/v1
+      - key: API_TITLE
+        value: Clinical Crew
+      - key: API_VERSION
+        value: 1.0.0
+      - key: DEBUG
+        value: "false"
+      - key: CORS_ORIGINS
+        value: https://your-frontend-domain.com
+
+      # Agent Configuration
+      - key: MAX_INTERCONSULTAS_PARALELAS
+        value: "5"
+      - key: TIMEOUT_ESPECIALISTA_SEGUNDOS
+        value: "120"
+      - key: ENABLE_STREAMING
+        value: "true"
+      - key: MAX_RETRIES
+        value: "3"
+
+      # Logging
+      - key: LOG_LEVEL
+        value: INFO
+      - key: LOG_FORMAT
+        value: json
+
+      # Security
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+
+      # Environment
+      - key: ENVIRONMENT
+        value: production
+
+# Optional: Background worker for document indexing
+# Uncomment if you need a separate worker process
+#  - type: worker
+#    name: clinical-crew-indexer
+#    runtime: docker
+#    dockerfilePath: ./Dockerfile
+#    dockerCommand: python -m app.rag.document_indexer --all
+#    plan: starter
+#    region: oregon
+#    branch: main
+#    envVars:
+#      # Reuse same environment variables as API
+#      - fromService:
+#          type: web
+#          name: clinical-crew-api
+#          envVarKey: '*'

@@ -54,9 +54,11 @@ class VectorStore:
         try:
             collection = self.client.get_collection(name=collection_name)
         except Exception:
+            # ChromaDB requires at least one metadata field
+            collection_metadata = metadata or {"specialty": name}
             collection = self.client.create_collection(
                 name=collection_name,
-                metadata=metadata or {}
+                metadata=collection_metadata
             )
 
         return collection
