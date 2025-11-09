@@ -215,5 +215,33 @@ class VectorStore:
         collection.delete(ids=[document_id])
 
 
-# Global vector store instance
-vector_store = VectorStore()
+# Lazy initialization wrapper to avoid ChromaDB initialization when using File Search
+class LazyVectorStore:
+    """
+    Lazy proxy for VectorStore that only initializes when accessed.
+    This prevents ChromaDB from starting when use_file_search=True.
+    """
+
+    def __init__(self):
+        self._instance: Optional[VectorStore] = None
+
+    def _get_instance(self) -> VectorStore:
+        """Get or create the VectorStore instance."""
+        if settings.use_file_search:
+            raise RuntimeError(
+                "ChromaDB vector store is disabled when use_file_search=True. "
+                "Use Gemini File Search API instead."
+            )
+
+        if self._instance is None:
+            self._instance = VectorStore()
+
+        return self._instance
+
+    def __getattr__(self, name: str):
+        """Proxy all attribute access to the actual VectorStore."""
+        return getattr(self._get_instance(), name)
+
+
+# Global vector store instance (uses lazy initialization)
+vector_store = LazyVectorStore()  # type: ignore[assignment]

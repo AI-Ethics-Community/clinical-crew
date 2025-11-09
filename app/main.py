@@ -54,11 +54,13 @@ async def lifespan(app: FastAPI):
     await init_db(database)
     print("✓ MongoDB connected and Beanie initialized")
 
-    # Verify ChromaDB directory exists
-    import os
-
-    os.makedirs(settings.chroma_persist_directory, exist_ok=True)
-    print(f"✓ ChromaDB directory ready: {settings.chroma_persist_directory}")
+    # Verify vectorstore directory (only if using ChromaDB)
+    if not settings.use_file_search:
+        import os
+        os.makedirs(settings.chroma_persist_directory, exist_ok=True)
+        print(f"✓ ChromaDB directory ready: {settings.chroma_persist_directory}")
+    else:
+        print("✓ Using Gemini File Search (ChromaDB disabled)")
 
     # Initialize Agent Cards
     print("\n📋 Loading Agent Cards...")
