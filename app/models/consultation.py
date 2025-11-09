@@ -102,6 +102,8 @@ class CounterReferralNote(BaseModel):
     evidence_level: str = Field(..., description="Evidence level of the response")
     confidence_level: str = Field(default="medium", description="Confidence level: high, medium, low")
     information_limitations: List[str] = Field(default_factory=list, description="Information limitations")
+    requires_additional_info: bool = Field(default=False, description="Whether additional information is required")
+    additional_questions: List[str] = Field(default_factory=list, description="Additional questions if more info needed")
     sources: List[ScientificSource] = Field(default_factory=list, description="Scientific sources used")
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 

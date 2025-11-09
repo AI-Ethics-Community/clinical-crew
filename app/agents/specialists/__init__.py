@@ -22,12 +22,20 @@ SPECIALIST_AGENTS = {
 }
 
 
-def get_specialist_agent(specialty: str) -> SpecialistAgent:
+def get_specialist_agent(
+    specialty: str,
+    on_tool_start=None,
+    on_tool_complete=None,
+    on_source_found=None
+) -> SpecialistAgent:
     """
     Get specialist agent by specialty name.
 
     Args:
         specialty: Specialty name (e.g., "cardiologia" or "cardiology")
+        on_tool_start: Optional callback when a tool starts
+        on_tool_complete: Optional callback when a tool completes
+        on_source_found: Optional callback when a source is found
 
     Returns:
         Specialist agent instance
@@ -37,10 +45,33 @@ def get_specialist_agent(specialty: str) -> SpecialistAgent:
     """
     specialty_lower = specialty.lower()
 
-    if specialty_lower not in SPECIALIST_AGENTS:
+    # Map both Spanish and English names to canonical English names
+    specialty_map = {
+        "cardiologia": "cardiology",
+        "cardiología": "cardiology",
+        "cardiology": "cardiology",
+        "endocrinologia": "endocrinology",
+        "endocrinología": "endocrinology",
+        "endocrinology": "endocrinology",
+        "farmacologia": "pharmacology",
+        "farmacología": "pharmacology",
+        "pharmacology": "pharmacology",
+    }
+
+    if specialty_lower not in specialty_map:
         raise ValueError(f"Specialist not found: {specialty}")
 
-    return SPECIALIST_AGENTS[specialty_lower]
+    canonical_specialty = specialty_map[specialty_lower]
+
+    # Create new instance with callbacks
+    if canonical_specialty == "cardiology":
+        return CardiologiaAgent(on_tool_start, on_tool_complete, on_source_found)
+    elif canonical_specialty == "endocrinology":
+        return EndocrinologiaAgent(on_tool_start, on_tool_complete, on_source_found)
+    elif canonical_specialty == "pharmacology":
+        return FarmacologiaAgent(on_tool_start, on_tool_complete, on_source_found)
+    else:
+        raise ValueError(f"Specialist not found: {specialty}")
 
 
 __all__ = [

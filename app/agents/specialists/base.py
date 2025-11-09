@@ -359,5 +359,7 @@ class SpecialistAgent:
             evidence_level=response_data.get('evidence_level', 'Unknown'),
             confidence_level=response_data.get('confidence_level', 'medium'),
             information_limitations=response_data.get('information_limitations', []),
+            requires_additional_info=response_data.get('requires_additional_info', False),
+            additional_questions=response_data.get('additional_questions', []),
             sources=self.sources
         )
