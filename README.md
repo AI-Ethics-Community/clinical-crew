@@ -913,7 +913,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 
 ## License
 
-[MIT License](LICENSE)
+[BSD 2-Clause License](LICENSE)
+
+Copyright (c) 2025, Diego Lerma
 
 ## Acknowledgments
 
