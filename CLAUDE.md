@@ -79,6 +79,9 @@ pytest --cov=app tests/
 # Run specific test file
 pytest tests/test_agents/test_graph.py
 
+# Test PubMed keyword extraction
+python test_pubmed_keywords.py
+
 # Run example usage
 python example_usage.py
 ```
@@ -148,6 +151,33 @@ FastAPI endpoints in `app/api/v1/`:
 - `POST /api/v1/consultation/{id}/responder` - Provide additional information
 
 ## Important Implementation Details
+
+### Bilingual Support and PubMed Integration
+
+**Key Feature**: The system accepts Spanish medical consultations and intelligently translates them to English MeSH terms for PubMed searches.
+
+**Keyword Extraction Pipeline** (`app/services/pubmed_client.py` and `app/agents/prompts/pubmed_keywords.py`):
+
+1. Spanish consultation question received
+2. Gemini Flash extracts 3-5 core medical concepts
+3. Concepts translated to standard English medical terminology
+4. MeSH (Medical Subject Headings) terms suggested when applicable
+5. Optimized PubMed search query generated
+
+Example flow:
+```python
+# Input (Spanish)
+"Paciente con diabetes gestacional de 28 semanas con mal control glucémico"
+
+# Output (English MeSH)
+{
+  "keywords": ["gestational diabetes", "pregnancy", "third trimester", "glycemic control"],
+  "mesh_terms": ["diabetes, gestational[mesh]", "pregnancy trimester, third[mesh]"],
+  "suggested_query": "diabetes, gestational[mesh] AND pregnancy trimester, third[mesh] AND blood glucose[mesh]"
+}
+```
+
+This ensures high-quality, evidence-based literature retrieval from PubMed regardless of input language.
 
 ### Medical Note Generation
 
@@ -359,20 +389,33 @@ settings.gemini_api_key
 - Use fixtures for common setup (test database, mock clients)
 - Test error cases and edge cases, not just happy paths
 
-## Translation Status
+## Translation and Bilingual Support
 
-The codebase is in transition from Spanish to English. There's a `translate_project.py` script for automated translation. Current state (per git status):
+### Codebase Translation Status
 
-- Original Spanish files are marked for deletion (AD)
-- New English files exist as untracked (??)
-- Some files are being modified in-place (AM)
+The codebase is in transition from Spanish to English. There's a `translate_project.py` script for automated translation.
 
-When editing files, prefer the English versions in the new naming convention:
+When editing files, prefer the English naming convention:
 
 - `especialistas` → `specialists`
 - `consultas.py` → `consultations.py`
 - `notas.py` → `notes.py`
-- etc.
+- Variable names should use English: `pregunta` → `question`, `respuesta` → `response`
+
+**Current state**: Many internal variables and some docstrings remain in Spanish. This is acceptable during transition, but new code should use English.
+
+### User-Facing Bilingual Support
+
+**Important distinction**: While the codebase is being translated to English, the **application itself is bilingual**:
+
+- **Input**: Accepts medical consultations in Spanish (primary use case for Latin American medical professionals)
+- **Processing**: Internal processing and PubMed searches use English medical terminology
+- **Output**: Clinical records and responses are in Spanish for end users
+
+**Translation Pipeline**:
+- Spanish medical query → Gemini extracts concepts → English MeSH terms → PubMed search → Spanish clinical response
+
+This dual-language architecture is intentional and should be preserved.
 
 ## Environment Variables
 
@@ -407,6 +450,9 @@ app/
 │   ├── general_practitioner.py
 │   ├── specialists/ # Specialist agents
 │   └── prompts/     # System prompts
+│       ├── general_practitioner.py  # GP agent prompts
+│       ├── specialists.py           # Specialist agent prompts
+│       └── pubmed_keywords.py       # PubMed keyword extraction prompts
 ├── api/v1/          # FastAPI endpoints
 ├── models/          # Pydantic models + Beanie ODM
 ├── rag/             # RAG system (embeddings, vector store, retrieval)
@@ -532,6 +578,8 @@ SPECIALIST_AGENTS = {
 
 ## Debugging Tips
 
+### General Debugging
+
 - Check `execution_trace` field in MongoDB documents to see workflow progression
 - MongoDB health check: `docker exec hacknation_mongodb mongosh --eval "db.adminCommand('ping')"`
 - ChromaDB collections: Check `./data/vectorstore` directory
@@ -539,6 +587,28 @@ SPECIALIST_AGENTS = {
 - Use `example_usage.py` for quick API testing
 - Check running server: `ps aux | grep "python3 -m app.main"`
 - View real-time logs when running in background: Check the BashOutput for the running process
+
+### PubMed Keyword Extraction Debugging
+
+When debugging PubMed searches:
+
+```python
+# The PubMedClient now includes keyword extraction
+# Check what keywords are being extracted:
+client = PubMedClient()
+result = await client.extract_medical_keywords_async(
+    pregunta="Paciente con diabetes...",
+    specialty="endocrinology"
+)
+print(f"Keywords: {result['keywords']}")
+print(f"MeSH terms: {result['mesh_terms']}")
+print(f"Query: {result['suggested_query']}")
+```
+
+Common issues:
+- If PubMed returns too few results, check if MeSH terms are too specific
+- If getting irrelevant results, verify keyword extraction is working correctly
+- Gemini Flash model must be configured with low temperature (0.1) for consistent keyword extraction
 
 ### Quick Verification Commands
 

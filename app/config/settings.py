@@ -49,6 +49,12 @@ class Settings(BaseSettings):
     pubmed_api_key: str = Field(default="")
     pubmed_max_results: int = Field(default=10)
     pubmed_tool_name: str = Field(default="ClinicalCrew")
+    pubmed_retry_max_attempts: int = Field(default=3)
+    pubmed_retry_backoff_factor: float = Field(default=2.0)
+    pubmed_batch_size: int = Field(default=50)
+    pubmed_use_mesh_extraction: bool = Field(default=True)
+    pubmed_min_year: int = Field(default=2015)
+    pubmed_max_year: int = Field(default=2025)
 
     # =============================================================================
     # API

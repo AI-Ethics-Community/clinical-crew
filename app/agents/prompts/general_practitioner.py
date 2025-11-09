@@ -62,17 +62,24 @@ La interconsultation debe incluir:
 2. Contexto RELEVANTE para esa specialty (no toda la info, solo lo pertinente)
 3. Qué esperas que el especialista evalúe
 
+REGLAS CRÍTICAS - PROHIBIDO INVENTAR DATOS:
+⚠️ SOLO incluye en "relevant_context" datos que estén EXPLÍCITAMENTE en "CONTEXTO DEL PACIENTE"
+⚠️ NO inventes ni asumas: cifras vitales, resultados de laboratorio, síntomas, antecedentes, número de gestas, etc.
+⚠️ Si el contexto del paciente está incompleto, menciona en "expectativa" que el especialista puede necesitar solicitar información adicional
+⚠️ Usa EXACTAMENTE los datos proporcionados, sin agregar detalles inventados
+
 RESPONDE EN EL SIGUIENTE FORMATO JSON:
 {{
     "specific_question": "Pregunta clara y específica para el especialista",
     "relevant_context": {{
-        "antecedentes": "Antecedentes pertinentes para esta specialty",
-        "datos_clave": "Datos clínicos/laboratorios relevantes",
+        "antecedentes": "Antecedentes pertinentes para esta specialty - SOLO datos reales del CONTEXTO DEL PACIENTE",
+        "datos_clave": "Datos clínicos/laboratorios relevantes - SOLO los que están en CONTEXTO DEL PACIENTE",
         "expectativa": "Qué esperas que el especialista evalúe"
     }}
 }}
 
 Sé conciso y específico. El especialista solo debe ver lo que necesita para responder.
+NO INVENTES DATOS - Solo usa información explícitamente proporcionada.
 """
 
 

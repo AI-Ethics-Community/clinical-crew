@@ -6,8 +6,8 @@ specialists:
   cardiology:
     name: "Cardiology"
     description: "Specialist in heart diseases and cardiovascular system"
-    model: "gemini-2.5-flash-latest"
-    temperature: 0.1
+    model: "models/gemini-2.5-pro"
+    temperature: 0.05
     rag_collection: "cardiology_kb"
     enabled: true
 
@@ -34,6 +34,13 @@ specialists:
       - Be specific and evidence-based in your response
       - If information is missing, clearly request it
 
+      CRITICAL RULES - DO NOT FABRICATE DATA:
+      ⚠️ Work ONLY with data explicitly provided in patient context
+      ⚠️ DO NOT invent: blood pressure readings, lab results, symptoms, physical findings, medical history, parity status, etc.
+      ⚠️ If critical information is MISSING, you MUST set "requires_additional_info": true and list specific questions needed
+      ⚠️ It is BETTER to request missing information than to assume or fabricate data
+      ⚠️ Only reference patient data that is literally stated in the patient information section
+
       Response format: Counter-Referral Note
 
     expert_topics:
@@ -47,8 +54,8 @@ specialists:
   endocrinology:
     name: "Endocrinology"
     description: "Specialist in endocrine system disorders and metabolism"
-    model: "gemini-2.5-flash-latest"
-    temperature: 0.1
+    model: "models/gemini-2.5-pro"
+    temperature: 0.05
     rag_collection: "endocrinology_kb"
     enabled: true
 
@@ -75,6 +82,13 @@ specialists:
       - Specify applied diagnostic criteria
       - Request additional laboratory tests if necessary
 
+      CRITICAL RULES - DO NOT FABRICATE DATA:
+      ⚠️ Work ONLY with data explicitly provided in patient context
+      ⚠️ DO NOT invent: glucose levels, HbA1c values, thyroid function tests, hormone levels, symptoms, physical findings, etc.
+      ⚠️ If critical information is MISSING, you MUST set "requires_additional_info": true and list specific questions needed
+      ⚠️ It is BETTER to request missing information than to assume or fabricate data
+      ⚠️ Only reference patient data that is literally stated in the patient information section
+
       Response format: Counter-Referral Note
 
     expert_topics:
@@ -88,8 +102,8 @@ specialists:
   pharmacology:
     name: "Clinical Pharmacology"
     description: "Specialist in pharmacotherapy, drug interactions and drug safety"
-    model: "gemini-2.5-flash-latest"
-    temperature: 0.1
+    model: "models/gemini-2.5-pro"
+    temperature: 0.05
     rag_collection: "pharmacology_kb"
     enabled: true
 
@@ -117,6 +131,13 @@ specialists:
       - Cite pharmacological sources used
       - Provide therapeutic alternatives if necessary
 
+      CRITICAL RULES - DO NOT FABRICATE DATA:
+      ⚠️ Work ONLY with medications and data explicitly provided in patient context
+      ⚠️ DO NOT invent: current medications, doses, lab values (creatinine, liver enzymes), allergies, or other clinical data
+      ⚠️ If critical information is MISSING (e.g., renal function for dose adjustment), you MUST set "requires_additional_info": true
+      ⚠️ It is BETTER to request missing information than to assume or fabricate data
+      ⚠️ Only reference patient data that is literally stated in the patient information section
+
       Response format: Counter-Referral Note
 
     expert_topics:
@@ -131,8 +152,8 @@ specialists:
 general_practitioner:
   name: "General Practitioner"
   description: "Interconsultation coordinator and comprehensive care"
-  model: "gemini-2.5-pro-latest"
-  temperature: 0.2
+  model: "models/gemini-2.5-pro"
+  temperature: 0.1
   rag_collection: "general_medicine_kb"
 
   system_prompt: |
@@ -164,6 +185,11 @@ general_practitioner:
     - SPECIFIC question you need answered
     - Pertinent patient information
     - What you expect the specialist to evaluate
+
+    CRITICAL RULES - DO NOT FABRICATE DATA:
+    ⚠️ Work ONLY with data explicitly provided in patient context
+    ⚠️ DO NOT invent clinical data when generating interconsultations
+    ⚠️ Pass only the actual patient data to specialists
 
     When integrating responses:
     - Summarize each specialist's recommendations

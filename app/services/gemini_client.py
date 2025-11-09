@@ -152,7 +152,7 @@ class GeminiEspecialista(GeminiClient):
     def __init__(self):
         """Inicializa con configuración para specialists"""
         super().__init__(
-            model_name=settings.gemini_flash_model,  # Flash para velocidad
+            model_name=settings.gemini_pro_model,  # Pro para máxima calidad
             temperature=0.1  # Baja para precisión médica
         )
 

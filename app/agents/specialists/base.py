@@ -118,31 +118,76 @@ class SpecialistAgent:
         max_results: int = 5
     ) -> str:
         """
-        Search PubMed for relevant articles.
+        Search PubMed for relevant articles using keyword extraction.
 
         Args:
-            pregunta: Question to search for
+            pregunta: Spanish medical question to search for
             max_results: Maximum number of articles
 
         Returns:
             Formatted articles from PubMed
         """
         try:
-            # Build search query
-            query = f"{pregunta} {self.specialty}"
-
-            # Search with cache
-            articles = await pubmed_client.search_with_cache(
+            # Step 1: Extract medical keywords from Spanish question
+            if settings.pubmed_use_mesh_extraction:
+                print(f"💡 Extracting medical keywords for PubMed search...")
+                try:
+                    keywords_data = await pubmed_client.extract_medical_keywords_async(
+                        pregunta, self.specialty
+                    )
+                except Exception as e:
+                    print(f"⚠ Keyword extraction failed: {str(e)}. Using specialty fallback.")
+                    # Fallback to simple specialty search
+                    keywords_data = {
+                        "keywords": [self.specialty],
+                        "mesh_terms": [],
+                        "suggested_query": self.specialty
+                    }
+            else:
+                # Keyword extraction disabled
+                keywords_data = {
+                    "keywords": [self.specialty],
+                    "mesh_terms": [],
+                    "suggested_query": self.specialty
+                }
+            
+            # Step 2: Build MeSH query with date range
+            query = pubmed_client.build_mesh_query(
+                keywords_data,
+                min_year=settings.pubmed_min_year,
+                max_year=settings.pubmed_max_year
+            )
+            
+            if not query:
+                print("⚠ Could not build query from keywords")
+                return "No articles found in PubMed."
+            
+            print(f"🔍 Final PubMed query: {query}")
+            
+            # Step 3: Search with retry logic
+            print(f"🔍 Searching PubMed: {query[:80]}...")
+            pmids = pubmed_client.search_with_retry(
                 query=query,
-                specialty=self.specialty,
                 max_results=max_results
             )
-
+            
+            if not pmids:
+                print("⚠ No articles found")
+                return "No relevant articles found in PubMed for this query."
+            
+            # Step 4: Fetch article details
+            articles = pubmed_client.fetch_details(pmids)
+            
+            if not articles:
+                print("⚠ Could not fetch article details")
+                return "No articles found in PubMed."
+            
             # Format for context
+            print(f"✓ Retrieved {len(articles)} PubMed articles")
             return pubmed_client.format_articles_for_context(articles)
 
         except Exception as e:
-            print(f"Error searching PubMed: {str(e)}")
+            print(f"✗ Error in PubMed search: {str(e)}")
             return "No articles found in PubMed."
 
     async def _generate_response(
@@ -175,7 +220,7 @@ class SpecialistAgent:
         contexto_str = json.dumps(contexto, indent=2, ensure_ascii=False)
 
         # Get system instruction from config
-        system_instruction = self.config.get('prompt_sistema', '')
+        system_instruction = self.config.get('system_prompt', '')
 
         # Build prompt
         prompt = get_prompt_especialista(
