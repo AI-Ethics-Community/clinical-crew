@@ -197,38 +197,38 @@ NOTA DEL MÉDICO GENERAL - EVALUACIÓN INICIAL
 
 
 class FormatoContextoPaciente:
-    """Formatea el contexto del paciente para las notes"""
+    """Formats patient context for notes"""
 
     @staticmethod
     def formatear(contexto: dict) -> str:
-        """Formatea el contexto del paciente"""
+        """Formats patient context"""
         partes = []
 
-        if contexto.get("edad"):
-            sexo = contexto.get("sexo", "").capitalize()
-            partes.append(f"• Paciente {sexo.lower()} de {contexto['edad']} años")
+        if contexto.get("age"):
+            sex = contexto.get("sex", "").capitalize()
+            partes.append(f"• Patient {sex.lower()} {contexto['age']} years old")
 
-        if contexto.get("diagnosticos"):
-            diags = ", ".join(contexto["diagnosticos"])
-            partes.append(f"• Diagnósticos: {diags}")
+        if contexto.get("diagnoses"):
+            diags = ", ".join(contexto["diagnoses"])
+            partes.append(f"• Diagnoses: {diags}")
 
-        if contexto.get("medicamentos_actuales"):
-            meds = "\n  - " + "\n  - ".join(contexto["medicamentos_actuales"])
-            partes.append(f"• Medicamentos actuales:{meds}")
+        if contexto.get("current_medications"):
+            meds = "\n  - " + "\n  - ".join(contexto["current_medications"])
+            partes.append(f"• Current medications:{meds}")
 
-        if contexto.get("alergias"):
-            if contexto["alergias"]:
-                alers = ", ".join(contexto["alergias"])
-                partes.append(f"• Alergias: {alers}")
+        if contexto.get("allergies"):
+            if contexto["allergies"]:
+                alers = ", ".join(contexto["allergies"])
+                partes.append(f"• Allergies: {alers}")
             else:
-                partes.append("• Sin alergias conocidas")
+                partes.append("• No known allergies")
 
-        if contexto.get("laboratorios"):
-            labs = "\n  - ".join([f"{k}: {v}" for k, v in contexto["laboratorios"].items()])
-            partes.append(f"• Laboratorios:\n  - {labs}")
+        if contexto.get("lab_results"):
+            labs = "\n  - ".join([f"{k}: {v}" for k, v in contexto["lab_results"].items()])
+            partes.append(f"• Laboratory results:\n  - {labs}")
 
-        if contexto.get("signos_vitales"):
-            sv = ", ".join([f"{k}: {v}" for k, v in contexto["signos_vitales"].items()])
-            partes.append(f"• Signos vitales: {sv}")
+        if contexto.get("vital_signs"):
+            sv = ", ".join([f"{k}: {v}" for k, v in contexto["vital_signs"].items()])
+            partes.append(f"• Vital signs: {sv}")
 
         return "\n".join(partes)

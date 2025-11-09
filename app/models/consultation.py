@@ -9,14 +9,14 @@ from app.models.sources import ScientificSource
 
 class PatientContext(BaseModel):
     """Patient clinical context"""
-    age: Optional[int] = Field(None, validation_alias='edad', description="Patient age", ge=0, le=150)
-    sex: Optional[str] = Field(None, validation_alias='sexo', description="Patient sex")
-    diagnoses: List[str] = Field(default_factory=list, validation_alias='diagnosticos', description="Known diagnoses")
-    current_medications: List[str] = Field(default_factory=list, validation_alias='medicamentos_actuales', description="Current medications")
-    allergies: List[str] = Field(default_factory=list, validation_alias='alergias', description="Known allergies")
-    medical_history: Optional[Dict[str, Any]] = Field(None, validation_alias='antecedentes', description="Additional medical history")
-    lab_results: Optional[Dict[str, Any]] = Field(None, validation_alias='laboratorios', description="Laboratory results")
-    vital_signs: Optional[Dict[str, Any]] = Field(None, validation_alias='signos_vitales', description="Recent vital signs")
+    age: Optional[int] = Field(None, description="Patient age", ge=0, le=150)
+    sex: Optional[str] = Field(None, description="Patient sex")
+    diagnoses: List[str] = Field(default_factory=list, description="Known diagnoses")
+    current_medications: List[str] = Field(default_factory=list, description="Current medications")
+    allergies: List[str] = Field(default_factory=list, description="Known allergies")
+    medical_history: Optional[Dict[str, Any]] = Field(None, description="Additional medical history")
+    lab_results: Optional[Dict[str, Any]] = Field(None, description="Laboratory results")
+    vital_signs: Optional[Dict[str, Any]] = Field(None, description="Recent vital signs")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -49,8 +49,8 @@ class InterrogationQuestion(BaseModel):
 class ConsultationCreate(BaseModel):
     """Model for creating a new consultation"""
     consultation: str = Field(..., description="Medical question or clinical case", min_length=10)
-    context: PatientContext = Field(..., validation_alias='contexto', description="Patient context")
-    user_id: Optional[str] = Field(None, validation_alias='usuario_id', description="User ID submitting the consultation")
+    context: PatientContext = Field(..., description="Patient context")
+    user_id: Optional[str] = Field(None, description="User ID submitting the consultation")
 
     model_config = ConfigDict(
         json_schema_extra={

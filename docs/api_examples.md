@@ -37,23 +37,23 @@ POST /api/v1/consultation
 ```json
 {
   "consultation": "Patient question or clinical case",
-  "contexto": {
-    "edad": 45,
-    "sexo": "masculino",
-    "diagnosticos": ["Diabetes Mellitus tipo 2", "Hipertensión arterial"],
-    "medicamentos_actuales": ["Metformina 850mg c/12h", "Losartán 50mg c/24h"],
-    "alergias": ["Penicilina"],
-    "laboratorios": {
-      "glucosa": "180 mg/dL",
+  "context": {
+    "age": 45,
+    "sex": "male",
+    "diagnoses": ["Type 2 Diabetes Mellitus", "Hypertension"],
+    "current_medications": ["Metformin 850mg q12h", "Losartan 50mg q24h"],
+    "allergies": ["Penicillin"],
+    "lab_results": {
+      "glucose": "180 mg/dL",
       "hba1c": "8.5%",
-      "creatinina": "1.2 mg/dL"
+      "creatinine": "1.2 mg/dL"
     },
-    "signos_vitales": {
-      "presion_arterial": "140/90 mmHg",
-      "frecuencia_cardiaca": "78 lpm"
+    "vital_signs": {
+      "blood_pressure": "140/90 mmHg",
+      "heart_rate": "78 bpm"
     }
   },
-  "usuario_id": "optional-user-id"
+  "user_id": "optional-user-id"
 }
 ```
 
@@ -61,9 +61,9 @@ POST /api/v1/consultation
 
 ```json
 {
-  "consulta_id": "507f1f77bcf86cd799439011",
-  "estado": "completado",
-  "mensaje": "Consultation completed successfully",
+  "consultation_id": "507f1f77bcf86cd799439011",
+  "status": "completed",
+  "message": "Consultation completed successfully",
   "clinical_record": {
     "general_summary": "Summary from general practitioner...",
     "complete_notes": "Complete formatted clinical record...",
@@ -80,13 +80,13 @@ POST /api/v1/consultation
 curl -X POST "http://localhost:8000/api/v1/consultation" \
   -H "Content-Type: application/json" \
   -d '{
-    "consultation": "Paciente con diabetes tipo 2 descompensada. ¿Puedo iniciar sertralina para depresión?",
-    "contexto": {
-      "edad": 45,
-      "sexo": "masculino",
-      "diagnosticos": ["Diabetes Mellitus tipo 2"],
-      "medicamentos_actuales": ["Metformina 850mg c/12h", "Glibenclamida 5mg c/24h"],
-      "alergias": []
+    "consultation": "Patient with decompensated type 2 diabetes. Can I start sertraline for depression?",
+    "context": {
+      "age": 45,
+      "sex": "male",
+      "diagnoses": ["Type 2 Diabetes Mellitus"],
+      "current_medications": ["Metformin 850mg q12h", "Glibenclamide 5mg q24h"],
+      "allergies": []
     }
   }'
 ```
@@ -99,13 +99,13 @@ import requests
 url = "http://localhost:8000/api/v1/consultation"
 
 data = {
-    "consultation": "Paciente con diabetes tipo 2 descompensada. ¿Puedo iniciar sertralina para depresión?",
-    "contexto": {
-        "edad": 45,
-        "sexo": "masculino",
-        "diagnosticos": ["Diabetes Mellitus tipo 2"],
-        "medicamentos_actuales": ["Metformina 850mg c/12h", "Glibenclamida 5mg c/24h"],
-        "alergias": []
+    "consultation": "Patient with decompensated type 2 diabetes. Can I start sertraline for depression?",
+    "context": {
+        "age": 45,
+        "sex": "male",
+        "diagnoses": ["Type 2 Diabetes Mellitus"],
+        "current_medications": ["Metformin 850mg q12h", "Glibenclamide 5mg q24h"],
+        "allergies": []
     }
 }
 
@@ -120,25 +120,25 @@ Check the current status of a consultation.
 ### Endpoint
 
 ```
-GET /api/v1/consultation/{consulta_id}/estado
+GET /api/v1/consultation/{consultation_id}/status
 ```
 
 ### Response
 
 ```json
 {
-  "consulta_id": "507f1f77bcf86cd799439011",
-  "estado": "interconsultando",
+  "consultation_id": "507f1f77bcf86cd799439011",
+  "status": "interconsulting",
   "created_at": "2025-11-08T10:30:00Z",
   "updated_at": "2025-11-08T10:31:00Z",
   "completed_at": null,
   "progress": {
-    "evaluacion_completada": true,
-    "interconsultas_generadas": 2,
-    "contrarreferencias_recibidas": 1,
-    "expediente_generado": false
+    "interrogation_completed": true,
+    "evaluation_completed": true,
+    "interconsultations_generated": 2,
+    "counter_referrals_received": 1,
+    "clinical_record_generated": false
   },
-  "pending_questions": [],
   "error": null
 }
 ```
@@ -146,7 +146,7 @@ GET /api/v1/consultation/{consulta_id}/estado
 ### cURL Example
 
 ```bash
-curl -X GET "http://localhost:8000/api/v1/consultation/507f1f77bcf86cd799439011/estado"
+curl -X GET "http://localhost:8000/api/v1/consultation/507f1f77bcf86cd799439011/status"
 ```
 
 ## Get Complete Consultation
@@ -156,23 +156,25 @@ Retrieve the complete consultation with all details.
 ### Endpoint
 
 ```
-GET /api/v1/consultation/{consulta_id}
+GET /api/v1/consultation/{consultation_id}
 ```
 
 ### Response
 
 ```json
 {
-  "consulta_id": "507f1f77bcf86cd799439011",
-  "usuario_id": null,
-  "original_consultation": "Paciente con diabetes tipo 2...",
+  "consultation_id": "507f1f77bcf86cd799439011",
+  "user_id": null,
+  "original_consultation": "Patient with type 2 diabetes...",
   "patient_context": { ... },
-  "estado": "completado",
+  "status": "completed",
   "timestamp": "2025-11-08T10:30:00Z",
+  "interrogation_questions": [],
+  "interrogation_completed": true,
   "general_evaluation": {
     "can_answer_directly": false,
-    "required_specialists": ["Endocrinología", "Farmacología"],
-    "razonamiento": "...",
+    "required_specialists": ["Endocrinology", "Pharmacology"],
+    "reasoning": "...",
     "estimated_complexity": 0.7
   },
   "interconsultations": [...],
@@ -185,22 +187,21 @@ GET /api/v1/consultation/{consulta_id}
 
 ## Provide Additional Information
 
-If specialists request additional information, use this endpoint.
+If the GP requests additional patient information during interrogation, use this endpoint.
 
 ### Endpoint
 
 ```
-POST /api/v1/consultation/{consulta_id}/responder
+POST /api/v1/consultation/{consultation_id}/respond
 ```
 
 ### Request Body
 
 ```json
 {
-  "additional_information": {
-    "creatinina": "1.2 mg/dL",
-    "hba1c": "8.5%",
-    "presion_arterial": "140/90 mmHg"
+  "responses": {
+    "question_id_1": "answer_value_1",
+    "question_id_2": "answer_value_2"
   }
 }
 ```
@@ -209,9 +210,9 @@ POST /api/v1/consultation/{consulta_id}/responder
 
 ```json
 {
-  "consulta_id": "507f1f77bcf86cd799439011",
-  "estado": "procesando",
-  "mensaje": "Additional information received. Processing continues..."
+  "consultation_id": "507f1f77bcf86cd799439011",
+  "status": "processing",
+  "message": "Responses received. Processing continues..."
 }
 ```
 
@@ -225,13 +226,13 @@ POST /api/v1/consultation/{consulta_id}/responder
 curl -X POST "http://localhost:8000/api/v1/consultation" \
   -H "Content-Type: application/json" \
   -d '{
-    "consultation": "¿Cuáles son los signos de alerta de hipertensión arterial?",
-    "contexto": {
-      "edad": 55,
-      "sexo": "femenino",
-      "diagnosticos": [],
-      "medicamentos_actuales": [],
-      "alergias": []
+    "consultation": "What are the warning signs of hypertension?",
+    "context": {
+      "age": 55,
+      "sex": "female",
+      "diagnoses": [],
+      "current_medications": [],
+      "allergies": []
     }
   }'
 ```
@@ -246,28 +247,28 @@ curl -X POST "http://localhost:8000/api/v1/consultation" \
 curl -X POST "http://localhost:8000/api/v1/consultation" \
   -H "Content-Type: application/json" \
   -d '{
-    "consultation": "Paciente masculino de 55 años con DM2, HTA e historia familiar de cardiopatía isquémica. Presenta depresión mayor. ¿Cuál antidepresivo es más seguro considerando su perfil cardiovascular y metabólico?",
-    "contexto": {
-      "edad": 55,
-      "sexo": "masculino",
-      "diagnosticos": [
-        "Diabetes Mellitus tipo 2",
-        "Hipertensión arterial",
-        "Depresión mayor"
+    "consultation": "55-year-old male patient with type 2 diabetes, hypertension, and family history of ischemic heart disease. Presents with major depression. Which antidepressant is safest considering his cardiovascular and metabolic profile?",
+    "context": {
+      "age": 55,
+      "sex": "male",
+      "diagnoses": [
+        "Type 2 Diabetes Mellitus",
+        "Hypertension",
+        "Major Depression"
       ],
-      "medicamentos_actuales": [
-        "Metformina 1000mg c/12h",
-        "Enalapril 10mg c/12h",
-        "Aspirina 100mg c/24h"
+      "current_medications": [
+        "Metformin 1000mg q12h",
+        "Enalapril 10mg q12h",
+        "Aspirin 100mg q24h"
       ],
-      "alergias": [],
-      "antecedentes": {
-        "familiares": "Padre con IAM a los 60 años"
+      "allergies": [],
+      "medical_history": {
+        "family": "Father with MI at age 60"
       },
-      "laboratorios": {
-        "glucosa": "165 mg/dL",
+      "lab_results": {
+        "glucose": "165 mg/dL",
         "hba1c": "7.8%",
-        "colesterol_total": "220 mg/dL",
+        "total_cholesterol": "220 mg/dL",
         "ldl": "140 mg/dL"
       }
     }
@@ -284,21 +285,21 @@ curl -X POST "http://localhost:8000/api/v1/consultation" \
 curl -X POST "http://localhost:8000/api/v1/consultation" \
   -H "Content-Type: application/json" \
   -d '{
-    "consultation": "¿Existen interacciones significativas si agrego amiodarona a este paciente?",
-    "contexto": {
-      "edad": 68,
-      "sexo": "masculino",
-      "diagnosticos": [
-        "Fibrilación auricular",
-        "Hipertensión arterial",
-        "Hipotiroidismo"
+    "consultation": "Are there significant interactions if I add amiodarone to this patient?",
+    "context": {
+      "age": 68,
+      "sex": "male",
+      "diagnoses": [
+        "Atrial fibrillation",
+        "Hypertension",
+        "Hypothyroidism"
       ],
-      "medicamentos_actuales": [
-        "Warfarina 5mg c/24h",
-        "Atenolol 50mg c/12h",
-        "Levotiroxina 100mcg c/24h"
+      "current_medications": [
+        "Warfarin 5mg q24h",
+        "Atenolol 50mg q12h",
+        "Levothyroxine 100mcg q24h"
       ],
-      "alergias": []
+      "allergies": []
     }
   }'
 ```
